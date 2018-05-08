@@ -1307,8 +1307,18 @@ char isFertileAge( LiveObject *inPlayer ) {
         }
     }
 
-
-
+char isFatherAge( LiveObject *inPlayer ) {
+    double age = computeAge( inPlayer );
+                    
+    char f = getFemale( inPlayer );
+                    
+    if( age >= 14 && !f ) {
+        return true;
+        }
+    else {
+        return false;
+        }
+    }
 
 int computeFoodCapacity( LiveObject *inPlayer ) {
     int ageInYears = lrint( computeAge( inPlayer ) );
@@ -2922,6 +2932,7 @@ void processLoggedInPlayer( Socket *inSock,
     int numPlayers = players.size();
                             
     SimpleVector<LiveObject*> parentChoices;
+    SimpleVector<LiveObject*> adultMales;
     
 
     // lower the bad mother limit in low-population situations
@@ -2999,6 +3010,19 @@ void processLoggedInPlayer( Socket *inSock,
             if( canHaveBaby ) {
                 parentChoices.push_back( player );
                 }
+            }
+        }
+
+    for( int i=0; i<numPlayers; i++ ) {
+        LiveObject *player = players.getElement( i );
+        
+        if( player->error ) {
+            continue;
+            }
+
+        if( isFatherAge( player ) ) {
+            
+            adultMales.push_back( player );
             }
         }
 
@@ -3096,6 +3120,8 @@ void processLoggedInPlayer( Socket *inSock,
             
             // pick random mother from a weighted distribution based on 
             // each mother's temperature
+
+            // and proximity to an adult male
             
             
             // 0.5 temp is worth .5 weight
@@ -3106,7 +3132,19 @@ void processLoggedInPlayer( Socket *inSock,
             for( int i=0; i<parentChoices.size(); i++ ) {
                 LiveObject *p = parentChoices.getElementDirect( i );
 
-                totalTemp += 0.5 - abs( p->heat - 0.5 );
+                double distanceToClosestAduleMale = 10000;
+                for( int j=0; j<adultMales.size(); j++ ) {
+                    LiveObject *f = adultMales.getElementDirect( j );
+
+                    double xdiff = (f->xs - p->xs);
+                    double ydiff = (f->ys - p->ys);
+                    double distance = sqrt( xdiff * xdiff + ydiff * ydiff );
+                    if( distance < distanceToClosestAduleMale ) {
+                        distanceToClosestAduleMale = distance;
+                    }
+                }
+
+                totalTemp += ((0.5 - abs( p->heat - 0.5 )) * 10000 / distanceToClosestAduleMale);
                 }
 
             double choice = 
