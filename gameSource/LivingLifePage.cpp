@@ -231,6 +231,77 @@ static int getHomeDir( doublePair inCurrentPlayerPos,
 
 
 char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
+    // start with an ID list of just this player
+    int i = 0;
+    SimpleVector<int> ourLin;
+    ourLin.push_back( inOurObject->id );
+
+    while( i < ourLin.size() ) {
+        // get member at i in list, if there is a member there
+        int *currentID = ourLin.getElement( i );
+        if( *currentID != -1 ) {
+            LiveObject *currentMember = getGameObject( *currentID );
+            // add member's father to end of list
+            ourLin.push_back( currentMember->fatherID );
+            // add member's mother to end of list
+            ourLin.push_back( currentMember->motherID );
+        } else {
+            // add -1 for "nobody"
+            ourLin.push_back( -1 );
+            ourLin.push_back( -1 );
+        }
+        i++;
+    }
+
+    // start with an ID list of just that player
+    i = 0;
+    SimpleVector<int> theirLin;
+    ourLin.push_back( inTheirObject->id );
+
+    while( i < theirLin.size() ) {
+        // get member at i in list, if there is a member there
+        int *currentID = theirLin.getElement( i );
+        if( *currentID != -1 ) {
+            LiveObject *currentMember = getGameObject( *currentID );
+            // add member's father to end of list
+            theirLin.push_back( currentMember->fatherID );
+            // add member's mother to end of list
+            theirLin.push_back( currentMember->motherID );
+        } else {
+            // add -1 for "nobody"
+            theirLin.push_back( -1 );
+            theirLin.push_back( -1 );
+        }
+        i++;
+    }
+
+    int ourCommonAncestorIndex = 0;
+    int theirCommonAncestorIndex = 0;
+    int commonAncestorID = -1;
+
+    for( int i = 0; i < ourLin.size(); i++ ) {
+        for( int j = 0; j < theirLin.size(); j++ ) {
+            if( ourLin.getElement( i ) == ourLin.getElement( j )) {
+                commonAncestorID = *ourLin.getElement( i );
+                ourCommonAncestorIndex = i;
+                theirCommonAncestorIndex = j;
+                break;
+                break;
+            }
+        }
+    }
+
+    int ourDistanceToCommonAncestor = 0;
+    int theirDistanceToCommonAncestor = 0;
+    while ( 2 << ( ourDistanceToCommonAncestor + 1 ) <= ( ourCommonAncestorIndex +1 ) ) {
+        ourDistanceToCommonAncestor++;
+    }
+    while ( 2 << ( theirDistanceToCommonAncestor + 1 ) <= ( theirCommonAncestorIndex +1 ) ) {
+        theirDistanceToCommonAncestor++;
+    }
+
+
+
     SimpleVector<int> ourLin = inOurObject->lineage;
     SimpleVector<int> theirLin = inTheirObject->lineage;
     
