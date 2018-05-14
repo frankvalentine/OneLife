@@ -238,9 +238,9 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
 
     while( i < ourLin.size() ) {
         // get member at i in list, if there is a member there
-        int *currentID = ourLin.getElement( i );
-        if( *currentID != -1 ) {
-            LiveObject *currentMember = getGameObject( *currentID );
+        int currentID = ourLin.getElementDirect( i );
+        if( currentID != -1 ) {
+            LiveObject *currentMember = getGameObject( currentID );
             // add member's father to end of list
             ourLin.push_back( currentMember->fatherID );
             // add member's mother to end of list
@@ -260,9 +260,9 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
 
     while( i < theirLin.size() ) {
         // get member at i in list, if there is a member there
-        int *currentID = theirLin.getElement( i );
-        if( *currentID != -1 ) {
-            LiveObject *currentMember = getGameObject( *currentID );
+        int currentID = theirLin.getElementDirect( i );
+        if( currentID != -1 ) {
+            LiveObject *currentMember = getGameObject( currentID );
             // add member's father to end of list
             theirLin.push_back( currentMember->fatherID );
             // add member's mother to end of list
@@ -291,6 +291,10 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
         }
     }
 
+    if ( commonAncestorID == -1 ) {
+        return NULL;
+    }
+
     int ourDistanceToCommonAncestor = 0;
     int theirDistanceToCommonAncestor = 0;
     while ( 2 << ( ourDistanceToCommonAncestor + 1 ) <= ( ourCommonAncestorIndex +1 ) ) {
@@ -300,101 +304,51 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
         theirDistanceToCommonAncestor++;
     }
 
-
-
-    SimpleVector<int> ourLin = inOurObject->lineage;
-    SimpleVector<int> theirLin = inTheirObject->lineage;
-    
-    int ourID = inOurObject->id;
-    int theirID = inTheirObject->id;
-
-    char theyMale = getObject( inTheirObject->displayID )->male;
-    
-
-    if( ourLin.size() == 0 && theirLin.size() == 0 ) {
-        // both eve, no relation
-        return NULL;
-        }
-
     const char *main = "";
     char grand = false;
     int numGreats = 0;
     int cousinNum = 0;
     int cousinRemovedNum = 0;
-    
-    char found = false;
+    char theyMale = getObject( inTheirObject->displayID )->male;
 
-    for( int i=0; i<theirLin.size(); i++ ) {
-        if( theirLin.getElementDirect( i ) == ourID ) {
-            found = true;
-            
-            if( theyMale ) {
-                main = translate( "son" );
-                }
-            else {
-                main = translate( "daughter" );
-                }
-            if( i > 0  ) {
-                grand = true;
-                }
-            numGreats = i - 1;
-            }
-        }
-
-    if( ! found ) {
-        for( int i=0; i<ourLin.size(); i++ ) {
-            if( ourLin.getElementDirect( i ) == theirID ) {
-                found = true;
-                main = translate( "mother" );
-                if( i > 0  ) {
-                    grand = true;
-                    }
-                numGreats = i - 1;
-                }
-            }
-        }
-    
     char big = false;
     char little = false;
     char twin = false;
     char identical = false;
 
-    if( ! found ) {
-        // not a direct descendent or ancestor
-
-        // look for shared relation
-        int ourMatchIndex = -1;
-        int theirMatchIndex = -1;
-        
-        for( int i=0; i<ourLin.size(); i++ ) {
-            for( int j=0; j<theirLin.size(); j++ ) {
-                
-                if( ourLin.getElementDirect( i ) == 
-                    theirLin.getElementDirect( j ) ) {
-                    ourMatchIndex = i;
-                    theirMatchIndex = j;
-                    break;
-                    }
-                }
-            if( ourMatchIndex != -1 ) {
-                break;
-                }
+    if( ourDistanceToCommonAncestor == 0 ) {
+        // this is a direct descendant
+        if( theyMale ) {
+            main = translate( "son" );
             }
-        
-        if( ourMatchIndex == -1 ) {
-            return NULL;
+        else {
+            main = translate( "daughter" );
             }
-        
-        found = true;
-
-        if( theirMatchIndex == 0 && ourMatchIndex == 0 ) {
+        if( theirDistanceToCommonAncestor > 1 ) {
+            grand = true;
+            numGreats = 3 - theirDistanceToCommonAncestor;
+        }
+    } else if ( theirDistanceToCommonAncestor == 0 ) {
+        // this is a direct ancestor
+        if( theyMale ) {
+            main = translate( "father" );
+            }
+        else {
+            main = translate( "mother" );
+            }
+        if( ourDistanceToCommonAncestor > 1 ) {
+            grand = true;
+            numGreats = 3 - ourDistanceToCommonAncestor;
+        }
+    } else if ( ourDistanceToCommonAncestor == theirDistanceToCommonAncestor ) {
+        if ( ourDistanceToCommonAncestor == 1 ) {
+            // this is a sibling
             if( theyMale ) {
                 main = translate( "brother" );
                 }
             else {
                 main = translate( "sister" );
                 }
-            
             if( inOurObject->age < inTheirObject->age - 0.1 ) {
                 big = true;
                 }
@@ -409,42 +363,45 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
                     identical = true;
                     }
                 }
-            }
-        else if( theirMatchIndex == 0 ) {
-            if( theyMale ) {
-                main = translate( "uncle" );
-                }
-            else {
-                main = translate( "aunt" );
-                }
-            numGreats = ourMatchIndex - 1;
-            }
-        else if( ourMatchIndex == 0 ) {
-            if( theyMale ) {
-                main = translate( "nephew" );
-                }
-            else {
-                main = translate( "niece" );
-                }
-            numGreats = theirMatchIndex - 1;
+        } else {
+            // this is a cousin
+            main = translate( "cousin" );
+            cousinNum = ourDistanceToCommonAncestor - 1;
+        }
+    } else if ( theirDistanceToCommonAncestor == 1 ) {
+        // this is an aunt or uncle
+        if( theyMale ) {
+            main = translate( "uncle" );
             }
         else {
-            // cousin of some kind
-            
-            main = translate( "cousin" );
-            
-            // shallowest determines cousin number
-            // diff determines removed number
-            if( ourMatchIndex <= theirMatchIndex ) {
-                cousinNum = ourMatchIndex;
-                cousinRemovedNum = theirMatchIndex - ourMatchIndex;
-                }
-            else {
-                cousinNum = theirMatchIndex;
-                cousinRemovedNum = ourMatchIndex - theirMatchIndex;
-                }
+            main = translate( "aunt" );
             }
+        if( ourDistanceToCommonAncestor > 2 ) {
+            grand = true;
+            numGreats = 4 - ourDistanceToCommonAncestor;
         }
+    } else if ( ourDistanceToCommonAncestor == 1 ) {
+        // this is a nephew or niece
+        if( theyMale ) {
+            main = translate( "nephew" );
+            }
+        else {
+            main = translate( "niece" );
+            }
+        if( theirDistanceToCommonAncestor > 2 ) {
+            grand = true;
+            numGreats = 4 - theirDistanceToCommonAncestor;
+        }
+    } else {
+        // this is a removed cousin
+        main = translate( "cousin" );
+        if ( ourDistanceToCommonAncestor < theirDistanceToCommonAncestor ) {
+            cousinNum = ourDistanceToCommonAncestor - 1;
+        } else {
+            cousinNum = theirDistanceToCommonAncestor - 1;
+        }
+        cousinRemovedNum = abs( ourDistanceToCommonAncestor - theirDistanceToCommonAncestor );
+    }
 
 
     SimpleVector<char> buffer;
