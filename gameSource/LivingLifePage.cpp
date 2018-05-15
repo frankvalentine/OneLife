@@ -228,18 +228,32 @@ static int getHomeDir( doublePair inCurrentPlayerPos,
     return index;
     }
 
-
+static LiveObject *getGameObject( int inID );
 
 char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
     // start with an ID list of just this player
     int i = 0;
+    int generation = 0;
+    int totalPopulation = 1;
+    char foundPerson = false;
     SimpleVector<int> ourLin;
     ourLin.push_back( inOurObject->id );
 
     while( i < ourLin.size() ) {
         // get member at i in list, if there is a member there
+        if( i == totalPopulation ) {
+            // looking at a new generation
+            if( ! foundPerson ) {
+                // the 'generation' we just traversed was all empty members (-1)
+                break;
+            }
+            generation++;
+            totalPopulation += 1 << generation;
+            foundPerson = false;
+        }
         int currentID = ourLin.getElementDirect( i );
         if( currentID != -1 ) {
+            foundPerson = true;
             LiveObject *currentMember = getGameObject( currentID );
             // add member's father to end of list
             ourLin.push_back( currentMember->fatherID );
@@ -253,6 +267,10 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
         i++;
     }
 
+    while( ourLin.getElementDirect( ourLin.size() ) == -1 ) {
+        ourLin.shrink(ourLin.size() - 1 );
+    }
+
     // start with an ID list of just that player
     i = 0;
     SimpleVector<int> theirLin;
@@ -260,8 +278,19 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
 
     while( i < theirLin.size() ) {
         // get member at i in list, if there is a member there
+        if( i == totalPopulation ) {
+            // looking at a new generation
+            if( ! foundPerson ) {
+                // the 'generation' we just traversed was all empty members (-1)
+                break;
+            }
+            generation++;
+            totalPopulation += 1 << generation;
+            foundPerson = false;
+        }
         int currentID = theirLin.getElementDirect( i );
         if( currentID != -1 ) {
+            foundPerson = true;
             LiveObject *currentMember = getGameObject( currentID );
             // add member's father to end of list
             theirLin.push_back( currentMember->fatherID );
@@ -275,17 +304,23 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
         i++;
     }
 
+    while( theirLin.getElementDirect( theirLin.size() ) == -1 ) {
+        theirLin.shrink(theirLin.size() - 1 );
+    }
+
     int ourCommonAncestorIndex = 0;
     int theirCommonAncestorIndex = 0;
     int commonAncestorID = -1;
 
     for( int i = 0; i < ourLin.size(); i++ ) {
         for( int j = 0; j < theirLin.size(); j++ ) {
+            if( commonAncestorID != -1 ) {
+                break;
+            }
             if( ourLin.getElement( i ) == ourLin.getElement( j )) {
                 commonAncestorID = *ourLin.getElement( i );
                 ourCommonAncestorIndex = i;
                 theirCommonAncestorIndex = j;
-                break;
                 break;
             }
         }
@@ -297,10 +332,10 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
 
     int ourDistanceToCommonAncestor = 0;
     int theirDistanceToCommonAncestor = 0;
-    while ( 2 << ( ourDistanceToCommonAncestor + 1 ) <= ( ourCommonAncestorIndex +1 ) ) {
+    while ( 1 << ( ourDistanceToCommonAncestor + 1 ) <= ( ourCommonAncestorIndex +1 ) ) {
         ourDistanceToCommonAncestor++;
     }
-    while ( 2 << ( theirDistanceToCommonAncestor + 1 ) <= ( theirCommonAncestorIndex +1 ) ) {
+    while ( 1 << ( theirDistanceToCommonAncestor + 1 ) <= ( theirCommonAncestorIndex +1 ) ) {
         theirDistanceToCommonAncestor++;
     }
 
@@ -326,7 +361,7 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
             }
         if( theirDistanceToCommonAncestor > 1 ) {
             grand = true;
-            numGreats = 3 - theirDistanceToCommonAncestor;
+            numGreats = theirDistanceToCommonAncestor - 2;
         }
     } else if ( theirDistanceToCommonAncestor == 0 ) {
         // this is a direct ancestor
@@ -338,7 +373,7 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
             }
         if( ourDistanceToCommonAncestor > 1 ) {
             grand = true;
-            numGreats = 3 - ourDistanceToCommonAncestor;
+            numGreats = ourDistanceToCommonAncestor - 2;
         }
     } else if ( ourDistanceToCommonAncestor == theirDistanceToCommonAncestor ) {
         if ( ourDistanceToCommonAncestor == 1 ) {
@@ -378,7 +413,7 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
             }
         if( ourDistanceToCommonAncestor > 2 ) {
             grand = true;
-            numGreats = 4 - ourDistanceToCommonAncestor;
+            numGreats = ourDistanceToCommonAncestor - 3;
         }
     } else if ( ourDistanceToCommonAncestor == 1 ) {
         // this is a nephew or niece
@@ -390,15 +425,15 @@ char *getRelationName( LiveObject *inOurObject, LiveObject *inTheirObject ) {
             }
         if( theirDistanceToCommonAncestor > 2 ) {
             grand = true;
-            numGreats = 4 - theirDistanceToCommonAncestor;
+            numGreats = theirDistanceToCommonAncestor - 3;
         }
     } else {
         // this is a removed cousin
         main = translate( "cousin" );
         if ( ourDistanceToCommonAncestor < theirDistanceToCommonAncestor ) {
-            cousinNum = ourDistanceToCommonAncestor - 1;
+            cousinNum = ourDistanceToCommonAncestor;
         } else {
-            cousinNum = theirDistanceToCommonAncestor - 1;
+            cousinNum = theirDistanceToCommonAncestor;
         }
         cousinRemovedNum = abs( ourDistanceToCommonAncestor - theirDistanceToCommonAncestor );
     }
