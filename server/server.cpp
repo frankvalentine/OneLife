@@ -2993,7 +2993,7 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.id = nextID;
     nextID++;
 
-    AppLog::infoF("New player %s logging in, given id %d\n", newObject.email, newObject.id);
+    // AppLog::infoF("New player %s logging in, given id %d\n", newObject.email, newObject.id);
 
     SettingsManager::setSetting( "nextPlayerID",
                                  (int)nextID );
@@ -3048,22 +3048,22 @@ void processLoggedInPlayer( Socket *inSock,
             }
 
         if( player->isEve && !player->hasAdam ) {
-            AppLog::infoF("Player %d is an Eve with no Adam\n", player->id);
+            // AppLog::infoF("Player %d is an Eve with no Adam\n", player->id);
             unmatchedEves.push_back( player );
         }
 
         if( isFatherAge( player ) ) {
-            AppLog::infoF("Player %d is a male of age %d\n", player->id, computeAge( player ));
+            // AppLog::infoF("Player %d is a male of age %d\n", player->id, computeAge( player ));
             adultMales.push_back( player );
         } else if( isFertileAge( player ) ) {
-            AppLog::infoF("Player %d is a female of age %d\n", player->id, computeAge( player ));
+            // AppLog::infoF("Player %d is a female of age %d\n", player->id, computeAge( player ));
             // make sure this woman isn't on cooldown
             // and that she's not a bad mother
             char canHaveBaby = true;
 
             
             if( Time::timeSec() < player->birthCoolDown ) {
-                AppLog::infoF("Player %d is on birth cooldown\n", player->id);
+                // AppLog::infoF("Player %d is on birth cooldown\n", player->id);
                 canHaveBaby = false;
                 }
             
@@ -3107,13 +3107,13 @@ void processLoggedInPlayer( Socket *inSock,
                 if( numDead >= badMotherLimit ) {
                     // this is a bad mother who lets all babies die
                     // don't give them more babies
-                    AppLog::infoF("Player %d is a bad mother\n", player->id);
+                    // AppLog::infoF("Player %d is a bad mother\n", player->id);
                     canHaveBaby = false;
                     }
                 }
             
             if( canHaveBaby ) {
-                AppLog::infoF("Player %d is a an eligible mother\n", player->id);
+                // AppLog::infoF("Player %d is a an eligible mother\n", player->id);
                 motherChoices.push_back( player );
                 }
             }
@@ -3122,7 +3122,7 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.motherChainLength = 1;
 
     if( unmatchedEves.size() > 0 ) {
-        AppLog::infoF("There are %d unmatched Eves, spawning as an Adam\n", unmatchedEves.size());
+        // AppLog::infoF("There are %d unmatched Eves, spawning as an Adam\n", unmatchedEves.size());
         // new Adam
         // he starts almost full grown
 
@@ -3139,7 +3139,7 @@ void processLoggedInPlayer( Socket *inSock,
         }
 
     } else if( motherChoices.size() == 0 ) {
-        AppLog::infoF("No eligibile mothers and no unmatched Eves, spawning as an Eve\n");
+        // AppLog::infoF("No eligibile mothers and no unmatched Eves, spawning as an Eve\n");
         // new Eve
         // she starts almost full grown
 
@@ -3160,7 +3160,7 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.foodStore = computeFoodCapacity( &newObject );
 
     if( ! newObject.isEve && ! newObject.isAdam ) {
-        AppLog::infoF("Spawning as a baby\n");
+        // AppLog::infoF("Spawning as a baby\n");
         // babies start out almost starving
         newObject.foodStore = 2;
         }
@@ -3199,11 +3199,11 @@ void processLoggedInPlayer( Socket *inSock,
                                             unmatchedEves.size() - 1 );
         
         spawnTarget = unmatchedEves.getElementDirect( spawnTargetIndex );
-        AppLog::infoF("Spawning Adam next to %d\n", spawnTarget->id);
+        // AppLog::infoF("Spawning Adam next to %d\n", spawnTarget->id);
 
     }
     if( unmatchedEves.size() == 0 && motherChoices.size() > 0 ) {
-        AppLog::infoF("Choosing a mother\n");
+        // AppLog::infoF("Choosing a mother\n");
         // baby
         
         // pick random mother from a weighted distribution based on 
@@ -3220,7 +3220,7 @@ void processLoggedInPlayer( Socket *inSock,
         for( int i=0; i<motherChoices.size(); i++ ) {
             LiveObject *p = motherChoices.getElementDirect( i );
 
-            p->distanceToClosestAdultMale = 49;
+            p->distanceToClosestAdultMale = SettingsManager::getIntSetting( "fatherMaxDistance", 49 );
             for( int j=0; j<adultMales.size(); j++ ) {
                 LiveObject *f = adultMales.getElementDirect( j );
 
@@ -3228,11 +3228,11 @@ void processLoggedInPlayer( Socket *inSock,
                 double ydiff = (f->ys - p->ys);
                 double distance = sqrt( xdiff * xdiff + ydiff * ydiff );
 
-                AppLog::infoF("Distance to %d is %d\n", f->id, distance);
+                // AppLog::infoF("Distance to %d is %d\n", f->id, distance);
 
-                if( distance < 10 ) {
+                if( distance < SettingsManager::getIntSetting( "fatherMinDistance", 10 ) ) {
                     // within about a screen's distance, the chance is the same
-                    distance = 10;
+                    distance = SettingsManager::getIntSetting( "fatherMinDistance", 10 );
                 }
 
                 if( distance < p->distanceToClosestAdultMale || 
@@ -3242,12 +3242,13 @@ void processLoggedInPlayer( Socket *inSock,
                     // and wins a coin toss
                     p->distanceToClosestAdultMale = distance;
                     p->closestAdultMaleID = f->id;
-                    AppLog::infoF("Closest male is now %d at distance %d\n", f->id, distance);
+                    // AppLog::infoF("Closest male is now %d at distance %d\n", f->id, distance);
                 }
 
             }
 
-            totalTemp += (0.5 - abs( p->heat - 0.5 )) * (50 - p->distanceToClosestAdultMale);
+            totalTemp += (0.5 - abs( p->heat - 0.5 )) * (SettingsManager::getIntSetting( "fatherMaxDistance", 49 ) + 1
+                - p->distanceToClosestAdultMale);
             }
 
         double choice = 
@@ -3259,11 +3260,12 @@ void processLoggedInPlayer( Socket *inSock,
         for( int i=0; i<motherChoices.size(); i++ ) {
             LiveObject *p = motherChoices.getElementDirect( i );
 
-            totalTemp += (0.5 - abs( p->heat - 0.5 )) * (50 - p->distanceToClosestAdultMale);
+            totalTemp += (0.5 - abs( p->heat - 0.5 )) * (SettingsManager::getIntSetting( "fatherMaxDistance", 49 ) + 1
+                - p->distanceToClosestAdultMale);
             
             if( totalTemp >= choice ) {
                 spawnTarget = p;
-                AppLog::infoF("Choosing %d as mother\n", p->id);
+                // AppLog::infoF("Choosing %d as mother\n", p->id);
                 break;
                 }
             }
@@ -3271,7 +3273,7 @@ void processLoggedInPlayer( Socket *inSock,
 
         
         if( ! newObject.isEve && ! newObject.isAdam ) {
-            AppLog::infoF("New player is a baby, choosing race and updating mother's food store\n");
+            // AppLog::infoF("New player is a baby, choosing race and updating mother's food store\n");
             // mother giving birth to baby
             // take a ton out of her food store
 
@@ -3365,7 +3367,7 @@ void processLoggedInPlayer( Socket *inSock,
         
         if( spawnTarget->xs == spawnTarget->xd && 
             spawnTarget->ys == spawnTarget->yd ) {
-            AppLog::infoF("Mother is not moving, spawning baby at her location\n");
+            // AppLog::infoF("Mother is not moving, spawning baby at her location\n");
 
             // stationary mother
             newObject.xs = spawnTarget->xs;
@@ -3376,7 +3378,7 @@ void processLoggedInPlayer( Socket *inSock,
             }
         else {
             // find where mother is along path
-            AppLog::infoF("Mother is moving, calculating location\n");
+            // AppLog::infoF("Mother is moving, calculating location\n");
             GridPos cPos = computePartialMoveSpot( spawnTarget );
                         
             newObject.xs = cPos.x;
@@ -3387,7 +3389,7 @@ void processLoggedInPlayer( Socket *inSock,
             }
         }                    
     else if ( unmatchedEves.size() == 0 ) {
-        AppLog::infoF("Spawning Eve at a new Eve location\n");
+        // AppLog::infoF("Spawning Eve at a new Eve location\n");
         // else starts at civ outskirts (lone Eve)
         int startX, startY;
         getEvePosition( newObject.email, &startX, &startY );
@@ -3407,10 +3409,10 @@ void processLoggedInPlayer( Socket *inSock,
         newObject.xd = startX;
         newObject.yd = startY;    
     } else {
-        AppLog::infoF("Spawning Adam next to Eve\n");
+        // AppLog::infoF("Spawning Adam next to Eve\n");
         if( spawnTarget->xs == spawnTarget->xd && 
             spawnTarget->ys == spawnTarget->yd ) {
-            AppLog::infoF("Eve is not moving, spawning at her location\n");
+            // AppLog::infoF("Eve is not moving, spawning at her location\n");
             // stationary mother
             newObject.xs = spawnTarget->xs;
             newObject.ys = spawnTarget->ys;
@@ -3419,7 +3421,7 @@ void processLoggedInPlayer( Socket *inSock,
             newObject.yd = spawnTarget->ys;
             }
         else {
-            AppLog::infoF("Eve is moving, calculating her location\n");
+            // AppLog::infoF("Eve is moving, calculating her location\n");
             // find where Eve is along path
             GridPos cPos = computePartialMoveSpot( spawnTarget );
                         
@@ -3430,7 +3432,7 @@ void processLoggedInPlayer( Socket *inSock,
             newObject.yd = cPos.y;
 
             }
-        AppLog::infoF("Remembering that this Eve has an Adam\n");
+        // AppLog::infoF("Remembering that this Eve has an Adam\n");
         spawnTarget->hasAdam = true;
     }
     
@@ -3438,7 +3440,7 @@ void processLoggedInPlayer( Socket *inSock,
     int forceID = SettingsManager::getIntSetting( "forceEveObject", 0 );
     
     if( forceID > 0 ) {
-        AppLog::infoF("Forcing Eve displayID\n");
+        // AppLog::infoF("Forcing Eve displayID\n");
         newObject.displayID = forceID;
         }
     
@@ -3446,7 +3448,7 @@ void processLoggedInPlayer( Socket *inSock,
     float forceAge = SettingsManager::getFloatSetting( "forceEveAge", 0.0 );
     
     if( forceAge > 0 ) {
-        AppLog::infoF("Forcing Eve age\n");
+        // AppLog::infoF("Forcing Eve age\n");
         newObject.lifeStartTimeSeconds = 
             Time::getCurrentTime() - forceAge * ( 1.0 / getAgeRate() );
         }
@@ -3456,11 +3458,11 @@ void processLoggedInPlayer( Socket *inSock,
 
 
     if( areTriggersEnabled() ) {
-        AppLog::infoF("Triggers are enabled\n");
+        // AppLog::infoF("Triggers are enabled\n");
         int id = getTriggerPlayerDisplayID( inEmail );
         
         if( id != -1 ) {
-            AppLog::infoF("ID is not -1\n");
+            // AppLog::infoF("ID is not -1\n");
             newObject.displayID = id;
             
             newObject.lifeStartTimeSeconds = 
@@ -3481,7 +3483,7 @@ void processLoggedInPlayer( Socket *inSock,
         }
     
     
-    AppLog::infoF("Setting new object values\n");
+    // AppLog::infoF("Setting new object values\n");
     newObject.lineage = new SimpleVector<int>();
     
     newObject.name = NULL;
@@ -3565,7 +3567,7 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.fatherID = -1;
 
     if( spawnTarget != NULL && isFertileAge( spawnTarget ) && !newObject.isAdam ) {
-        AppLog::infoF("Setting new object's father and mother IDs\n");
+        // AppLog::infoF("Setting new object's father and mother IDs\n");
         // do not log babies that new Eve spawns next to as mothers
         // or Eves that Adam spawns next to
         newObject.motherID = spawnTarget->id;
@@ -3588,7 +3590,7 @@ void processLoggedInPlayer( Socket *inSock,
             }
         
         
-        AppLog::infoF("Copying some lineage stuff\n");
+        // AppLog::infoF("Copying some lineage stuff\n");
         for( int i=0; 
              i < spawnTarget->lineage->size() && 
                  i < maxLineageTracked - 1;
@@ -3617,7 +3619,7 @@ void processLoggedInPlayer( Socket *inSock,
     players.push_back( newObject );            
 
 
-    AppLog::infoF("Logging the birth\n");
+    // AppLog::infoF("Logging the birth\n");
     logBirth( newObject.id,
               newObject.email,
               newObject.motherID,
