@@ -3138,8 +3138,8 @@ void processLoggedInPlayer( Socket *inSock,
             newObject.displayID = maleID;
         }
 
-    } else if( motherChoices.size() == 0 ) {
-        // AppLog::infoF("No eligibile mothers and no unmatched Eves, spawning as an Eve\n");
+    } else if( motherChoices.size() == 0 || adultMales.size() == 0 ) {
+        // AppLog::infoF("No eligibile mothers or no eligible fathers and no unmatched Eves, spawning as an Eve\n");
         // new Eve
         // she starts almost full grown
 

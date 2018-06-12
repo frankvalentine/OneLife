@@ -20,6 +20,5 @@ fatherMaxDistance: (default 49) the distance beyond which all adult males are gi
 of being the father of the baby and being further than this distance does not decrease the chances of having
 a baby.
 
-The probability of having a baby is scaled between the minimum and maximum distance values. Because
-this is a scalar, if there are no adult males on the server, then all women will have the same
-probability of having a baby as in the base game.
+The probability of having a baby is scaled between the minimum and maximum distance values. If there
+are no adult males on the server, then the next player will spawn as an Eve.
