@@ -458,7 +458,7 @@ class LivingLifePage : public GamePage {
         double *mMapAnimationLastFrameCount;
         
         double *mMapAnimationFrozenRotFrameCount;
-        
+        char *mMapAnimationFrozenRotFrameCountUsed;
 
         int *mMapFloorAnimationFrameCount;
 

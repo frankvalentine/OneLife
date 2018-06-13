@@ -1712,7 +1712,8 @@ void LivingLifePage::clearMap() {
             randSource.getRandomBoundedInt( 0, 10000 );
         
         mMapAnimationFrozenRotFrameCount[i] = 0;
-
+        mMapAnimationFrozenRotFrameCountUsed[i] = false;
+        
         mMapFloorAnimationFrameCount[i] = 
             randSource.getRandomBoundedInt( 0, 10000 );
 
@@ -1908,6 +1909,8 @@ LivingLifePage::LivingLifePage()
     mMapAnimationFrameCount =  new double[ mMapD * mMapD ];
     mMapAnimationLastFrameCount =  new double[ mMapD * mMapD ];
     mMapAnimationFrozenRotFrameCount =  new double[ mMapD * mMapD ];
+
+    mMapAnimationFrozenRotFrameCountUsed =  new char[ mMapD * mMapD ];
     
     mMapFloorAnimationFrameCount =  new int[ mMapD * mMapD ];
 
@@ -2070,6 +2073,8 @@ LivingLifePage::~LivingLifePage() {
     delete [] mMapAnimationFrameCount;
     delete [] mMapAnimationLastFrameCount;
     delete [] mMapAnimationFrozenRotFrameCount;
+    
+    delete [] mMapAnimationFrozenRotFrameCountUsed;
 
     delete [] mMapFloorAnimationFrameCount;
 
@@ -2541,6 +2546,7 @@ void LivingLifePage::drawMapCell( int inMapI,
                 mMapAnimationFrameCount[ inMapI ] += animSpeed;
                 mMapAnimationLastFrameCount[ inMapI ] += animSpeed;
                 mMapAnimationFrozenRotFrameCount[ inMapI ] += animSpeed;
+                mMapAnimationFrozenRotFrameCountUsed[ inMapI ] = false;
                 }
             else {
                 mMapAnimationFrameCount[ inMapI ] ++;
@@ -2572,9 +2578,9 @@ void LivingLifePage::drawMapCell( int inMapI,
                         mMapAnimationLastFrameCount[ inMapI ] =
                             mMapAnimationFrameCount[ inMapI ];
                         
-                        mMapAnimationFrameCount[ inMapI ] = 0;
                         
-                        if( newType == moving ) {
+                        if( newType == moving &&
+                            mMapAnimationFrozenRotFrameCountUsed[ inMapI ] ) {
                             mMapAnimationFrameCount[ inMapI ] = 
                                 mMapAnimationFrozenRotFrameCount[ inMapI ];
                             }
@@ -2698,8 +2704,6 @@ void LivingLifePage::drawMapCell( int inMapI,
             }
                 
                 
-        // ignore
-        char used = false;
             
         char flip = mMapTileFlips[ inMapI ];
         
@@ -2828,7 +2832,7 @@ void LivingLifePage::drawMapCell( int inMapI,
                             fadeTargetType,
                             targetTimeVal,
                             frozenRotTimeVal,
-                            &used,
+                            &( mMapAnimationFrozenRotFrameCountUsed[ inMapI ] ),
                             endAnimType,
                             endAnimType,
                             passPos, rot, false, flip,
@@ -2848,7 +2852,7 @@ void LivingLifePage::drawMapCell( int inMapI,
                             fadeTargetType, 
                             targetTimeVal,
                             frozenRotTimeVal,
-                            &used,
+                            &( mMapAnimationFrozenRotFrameCountUsed[ inMapI ] ),
                             endAnimType,
                             endAnimType,
                             passPos, rot,
@@ -7473,7 +7477,6 @@ void LivingLifePage::step() {
                     mMapAnimationFrozenRotFrameCount[ i ] = 
                         mMapAnimationLastFrameCount[ i ];
                     
-                    mMapAnimationFrameCount[ i ] = 0;
                     }
                 }
             else {
@@ -8317,6 +8320,9 @@ void LivingLifePage::step() {
             double *newMapAnimationFrozenRotFameCount = 
                 new double[ mMapD * mMapD ];
 
+            char *newMapAnimationFrozenRotFameCountUsed = 
+                new char[ mMapD * mMapD ];
+
             int *newMapFloorAnimationFrameCount = new int[ mMapD * mMapD ];
         
             AnimType *newMapCurAnimType = new AnimType[ mMapD * mMapD ];
@@ -8361,6 +8367,7 @@ void LivingLifePage::step() {
                     newMapAnimationFrameCount[i];
                 
                 newMapAnimationFrozenRotFameCount[i] = 0;
+                newMapAnimationFrozenRotFameCountUsed[i] = false;
                 
                 newMapFloorAnimationFrameCount[i] =
                     lrint( getXYRandom( worldX, worldY ) * 13853 );
@@ -8405,6 +8412,9 @@ void LivingLifePage::step() {
                     newMapAnimationFrozenRotFameCount[i] = 
                         mMapAnimationFrozenRotFrameCount[oI];
 
+                    newMapAnimationFrozenRotFameCountUsed[i] = 
+                        mMapAnimationFrozenRotFrameCountUsed[oI];
+
                     newMapFloorAnimationFrameCount[i] = 
                         mMapFloorAnimationFrameCount[oI];
                     
@@ -8442,6 +8452,10 @@ void LivingLifePage::step() {
             memcpy( mMapAnimationFrozenRotFrameCount, 
                     newMapAnimationFrozenRotFameCount, 
                     mMapD * mMapD * sizeof( double ) );
+
+            memcpy( mMapAnimationFrozenRotFrameCountUsed, 
+                    newMapAnimationFrozenRotFameCountUsed, 
+                    mMapD * mMapD * sizeof( char ) );
 
             
             memcpy( mMapFloorAnimationFrameCount, 
@@ -8488,6 +8502,7 @@ void LivingLifePage::step() {
             delete [] newMapAnimationFrameCount;
             delete [] newMapAnimationLastFrameCount;
             delete [] newMapAnimationFrozenRotFameCount;
+            delete [] newMapAnimationFrozenRotFameCountUsed;
             delete [] newMapFloorAnimationFrameCount;
             
             delete [] newMapCurAnimType;
@@ -8940,9 +8955,12 @@ void LivingLifePage::step() {
                                     mMapCurAnimType[ mapI ] = moving;
                                     mMapLastAnimFade[ mapI ] = 1;
 
-                                    mMapAnimationFrameCount[ mapI ] =
-                                        mMapAnimationFrozenRotFrameCount[ 
-                                            oldMapI ];
+                                    if( mMapAnimationFrozenRotFrameCountUsed[
+                                            mapI ] ) {
+                                        mMapAnimationFrameCount[ mapI ] =
+                                            mMapAnimationFrozenRotFrameCount[ 
+                                                oldMapI ];
+                                        }
                                     }
                                 
                                 int oldLocID = mMap[ oldMapI ];
