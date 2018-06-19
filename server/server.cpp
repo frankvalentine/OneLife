@@ -3079,160 +3079,11 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.trueStartTimeSeconds = Time::getCurrentTime();
     newObject.lifeStartTimeSeconds = newObject.trueStartTimeSeconds;
                             
-
     newObject.lastSayTimeSeconds = Time::getCurrentTime();
-    
 
     newObject.heldByOther = false;
-                            
-    int numPlayers = players.size();
-                            
-    SimpleVector<LiveObject*> motherChoices;
-    SimpleVector<LiveObject*> adultMales;
-    SimpleVector<LiveObject*> unmatchedEves;
-    
-
-    // lower the bad mother limit in low-population situations
-    // so that babies aren't stuck with the same low-skill mother over and
-    // over
-    int badMotherLimit = 2 + numPlayers / 3;
-
-    if( badMotherLimit > 10 ) {
-        badMotherLimit = 10;
-        }
-    
-    // with new birth cooldowns, we don't need bad mother limit anymore
-    // try making it a non-factor
-    badMotherLimit = 9999999;
-    
-    
-    primeLineageTest( numPlayers );
-    
-
-    for( int i=0; i<numPlayers; i++ ) {
-        LiveObject *player = players.getElement( i );
-        
-        if( player->error ) {
-            continue;
-            }
-
-        if( player->isEve && !player->hasAdam ) {
-            // AppLog::infoF("Player %d is an Eve with no Adam\n", player->id);
-            unmatchedEves.push_back( player );
-        }
-
-        if( isFatherAge( player ) ) {
-            // AppLog::infoF("Player %d is a male of age %d\n", player->id, computeAge( player ));
-            adultMales.push_back( player );
-        } else if( isFertileAge( player ) ) {
-            // AppLog::infoF("Player %d is a female of age %d\n", player->id, computeAge( player ));
-            // make sure this woman isn't on cooldown
-            // and that she's not a bad mother
-            char canHaveBaby = true;
-
-            
-            if( Time::timeSec() < player->birthCoolDown ) {
-                // AppLog::infoF("Player %d is on birth cooldown\n", player->id);
-                canHaveBaby = false;
-                }
-            
-            if( ! isLinePermitted( newObject.email, player->lineageEveID ) ) {
-                // this line forbidden for new player
-                continue;
-                }
-            
-
-            int numPastBabies = player->babyIDs->size();
-            
-            if( canHaveBaby && numPastBabies >= badMotherLimit ) {
-                int numDead = 0;
-                
-                for( int b=0; b < numPastBabies; b++ ) {
-                    
-                    int bID = 
-                        player->babyIDs->getElementDirect( b );
-
-                    char bAlive = false;
-                    
-                    for( int j=0; j<numPlayers; j++ ) {
-                        LiveObject *otherObj = players.getElement( j );
-                    
-                        if( otherObj->error ) {
-                            continue;
-                            }
-
-                        int id = otherObj->id;
-                    
-                        if( id == bID ) {
-                            bAlive = true;
-                            break;
-                            }
-                        }
-                    if( ! bAlive ) {
-                        numDead ++;
-                        }
-                    }
-                
-                if( numDead >= badMotherLimit ) {
-                    // this is a bad mother who lets all babies die
-                    // don't give them more babies
-                    // AppLog::infoF("Player %d is a bad mother\n", player->id);
-                    canHaveBaby = false;
-                    }
-                }
-            
-            if( canHaveBaby ) {
-                // AppLog::infoF("Player %d is a an eligible mother\n", player->id);
-                motherChoices.push_back( player );
-                }
-            }
-        }
-
     newObject.motherChainLength = 1;
-
-    if( unmatchedEves.size() > 0 ) {
-        // AppLog::infoF("There are %d unmatched Eves, spawning as an Adam\n", unmatchedEves.size());
-        // new Adam
-        // he starts almost full grown
-
-        newObject.isAdam = true;
-        newObject.lineageEveID = newObject.id;
-        
-        newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
-
-        
-        int maleID = getRandomMalePersonObject();
-        
-        if( maleID != -1 ) {
-            newObject.displayID = maleID;
-        }
-
-    } else if( motherChoices.size() == 0 || adultMales.size() == 0 ) {
-        // AppLog::infoF("No eligibile mothers or no eligible fathers and no unmatched Eves, spawning as an Eve\n");
-        // new Eve
-        // she starts almost full grown
-
-        newObject.isEve = true;
-        
-        newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
-
-        
-        int femaleID = getRandomFemalePersonObject();
-        
-        if( femaleID != -1 ) {
-            newObject.displayID = femaleID;
-            }
-        }
-
-    // else player starts as newborn
-    // start full up to capacity with food
     newObject.foodStore = computeFoodCapacity( &newObject );
-
-    if( ! newObject.isEve && ! newObject.isAdam ) {
-        // AppLog::infoF("Spawning as a baby\n");
-        // babies start out almost starving
-        newObject.foodStore = 2;
-        }
 
     newObject.heat = 0.5;
 
@@ -3260,301 +3111,8 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.yd = 0;
     
     newObject.lastRegionLookTime = 0;
-    
-    LiveObject *spawnTarget = NULL;
-                
-    if( unmatchedEves.size() > 0 ) {
-        // spawned next to random unmatched Eve
-        int spawnTargetIndex = 
-            randSource.getRandomBoundedInt( 0,
-                                            unmatchedEves.size() - 1 );
-        
-        spawnTarget = unmatchedEves.getElementDirect( spawnTargetIndex );
-        // AppLog::infoF("Spawning Adam next to %d\n", spawnTarget->id);
-
-    }
-    if( unmatchedEves.size() == 0 && motherChoices.size() > 0 ) {
-        // AppLog::infoF("Choosing a mother\n");
-        // baby
-        
-        // pick random mother from a weighted distribution based on 
-        // each mother's temperature
-
-        // and proximity to an adult male
-        
-        
-        // 0.5 temp is worth .5 weight
-        // 1.0 temp and 0 are worth 0 weight
-        
-        double totalTemp = 0;
-        
-        for( int i=0; i<motherChoices.size(); i++ ) {
-            LiveObject *p = motherChoices.getElementDirect( i );
-
-            p->distanceToClosestAdultMale = SettingsManager::getIntSetting( "fatherMaxDistance", 49 );
-            for( int j=0; j<adultMales.size(); j++ ) {
-                LiveObject *f = adultMales.getElementDirect( j );
-
-                double xdiff = (f->xs - p->xs);
-                double ydiff = (f->ys - p->ys);
-                double distance = sqrt( xdiff * xdiff + ydiff * ydiff );
-
-                // AppLog::infoF("Distance to %d is %d\n", f->id, distance);
-
-                if( distance < SettingsManager::getIntSetting( "fatherMinDistance", 10 ) ) {
-                    // within about a screen's distance, the chance is the same
-                    distance = SettingsManager::getIntSetting( "fatherMinDistance", 10 );
-                }
-
-                if( distance < p->distanceToClosestAdultMale || 
-                ( distance == p->distanceToClosestAdultMale && 
-                randSource.getRandomBoundedDouble(0, 1 ) > 0.5 ) ) {
-                    // this guy is closer or this guy is the same distance
-                    // and wins a coin toss
-                    p->distanceToClosestAdultMale = distance;
-                    p->closestAdultMaleID = f->id;
-                    // AppLog::infoF("Closest male is now %d at distance %d\n", f->id, distance);
-                }
-
-            }
-
-            totalTemp += (0.5 - abs( p->heat - 0.5 )) * (SettingsManager::getIntSetting( "fatherMaxDistance", 49 ) + 1
-                - p->distanceToClosestAdultMale);
-            }
-
-        double choice = 
-            randSource.getRandomBoundedDouble( 0, totalTemp );
-        
-        
-        totalTemp = 0;
-        
-        for( int i=0; i<motherChoices.size(); i++ ) {
-            LiveObject *p = motherChoices.getElementDirect( i );
-
-            totalTemp += (0.5 - abs( p->heat - 0.5 )) * (SettingsManager::getIntSetting( "fatherMaxDistance", 49 ) + 1
-                - p->distanceToClosestAdultMale);
-            
-            if( totalTemp >= choice ) {
-                spawnTarget = p;
-                // AppLog::infoF("Choosing %d as mother\n", p->id);
-                break;
-                }
-            }
-        
-
-        
-        if( ! newObject.isEve && ! newObject.isAdam ) {
-            // AppLog::infoF("New player is a baby, choosing race and updating mother's food store\n");
-            // mother giving birth to baby
-            // take a ton out of her food store
-
-            int min = 4;
-            if( spawnTarget->foodStore < min ) {
-                min = spawnTarget->foodStore;
-                }
-            spawnTarget->foodStore -= babyBirthFoodDecrement;
-            if( spawnTarget->foodStore < min ) {
-                spawnTarget->foodStore = min;
-                }
-
-            spawnTarget->foodDecrementETASeconds +=
-                computeFoodDecrementTimeSeconds( spawnTarget );
-            
-            spawnTarget->foodUpdate = true;
-            
-
-            // only set race if the spawn-near player is our mother
-            // otherwise, we are a new Eve spawning next to a baby
-            
-            timeSec_t curTime = Time::timeSec();
-            
-            spawnTarget->babyBirthTimes->push_back( curTime );
-            spawnTarget->babyIDs->push_back( newObject.id );
-            
-            // set cool-down time before this worman can have another baby
-            spawnTarget->birthCoolDown = pickBirthCooldownSeconds() + curTime;
-
-            ObjectRecord *motherObject = getObject( spawnTarget->displayID );
-
-            // pick race of child
-            int numRaces;
-            int *races = getRaces( &numRaces );
-        
-            int motherRaceIndex = -1;
-            
-            for( int i=0; i<numRaces; i++ ) {
-                if( motherObject->race == races[i] ) {
-                    motherRaceIndex = i;
-                    break;
-                    }
-                }
-            
-
-            if( motherRaceIndex != -1 ) {
-                
-                int childRace = motherObject->race;
-                
-                if( randSource.getRandomDouble() > childSameRaceLikelihood ) {
-                    // different race than mother
-                    
-                    int offset = 1;
-                    
-                    if( randSource.getRandomBoolean() ) {
-                        offset = -1;
-                        }
-                    int childRaceIndex = motherRaceIndex + offset;
-                    
-                    // don't wrap around
-                    // but push in other direction instead
-                    if( childRaceIndex >= numRaces ) {
-                        childRaceIndex = numRaces - 2;
-                        }
-                    if( childRaceIndex < 0 ) {
-                        childRaceIndex = 1;
-                        }
-                    
-                    // stay in bounds
-                    if( childRaceIndex >= numRaces ) {
-                        childRaceIndex = numRaces - 1;
-                        }
-                    
-
-                    childRace = races[ childRaceIndex ];
-                    }
-                
-                if( childRace == motherObject->race ) {
-                    newObject.displayID = getRandomFamilyMember( 
-                        motherObject->race, spawnTarget->displayID, familySpan );
-                    }
-                else {
-                    newObject.displayID = 
-                        getRandomPersonObjectOfRace( childRace );
-                    }
-            
-                }
-        
-            delete [] races;
-            }
-        
-        if( spawnTarget->xs == spawnTarget->xd && 
-            spawnTarget->ys == spawnTarget->yd ) {
-            // AppLog::infoF("Mother is not moving, spawning baby at her location\n");
-
-            // stationary mother
-            newObject.xs = spawnTarget->xs;
-            newObject.ys = spawnTarget->ys;
-                        
-            newObject.xd = spawnTarget->xs;
-            newObject.yd = spawnTarget->ys;
-            }
-        else {
-            // find where mother is along path
-            // AppLog::infoF("Mother is moving, calculating location\n");
-            GridPos cPos = computePartialMoveSpot( spawnTarget );
-                        
-            newObject.xs = cPos.x;
-            newObject.ys = cPos.y;
-                        
-            newObject.xd = cPos.x;
-            newObject.yd = cPos.y;
-            }
-        }                    
-    else if ( unmatchedEves.size() == 0 ) {
-        // AppLog::infoF("Spawning Eve at a new Eve location\n");
-        // else starts at civ outskirts (lone Eve)
-        int startX, startY;
-        getEvePosition( newObject.email, &startX, &startY );
-
-        if( SettingsManager::getIntSetting( "forceEveLocation", 0 ) ) {
-
-            startX = 
-                SettingsManager::getIntSetting( "forceEveLocationX", 0 );
-            startY = 
-                SettingsManager::getIntSetting( "forceEveLocationY", 0 );
-            }
-        
-        
-        newObject.xs = startX;
-        newObject.ys = startY;
-        
-        newObject.xd = startX;
-        newObject.yd = startY;    
-    } else {
-        // AppLog::infoF("Spawning Adam next to Eve\n");
-        if( spawnTarget->xs == spawnTarget->xd && 
-            spawnTarget->ys == spawnTarget->yd ) {
-            // AppLog::infoF("Eve is not moving, spawning at her location\n");
-            // stationary mother
-            newObject.xs = spawnTarget->xs;
-            newObject.ys = spawnTarget->ys;
-                        
-            newObject.xd = spawnTarget->xs;
-            newObject.yd = spawnTarget->ys;
-            }
-        else {
-            // AppLog::infoF("Eve is moving, calculating her location\n");
-            // find where Eve is along path
-            GridPos cPos = computePartialMoveSpot( spawnTarget );
-                        
-            newObject.xs = cPos.x;
-            newObject.ys = cPos.y;
-                        
-            newObject.xd = cPos.x;
-            newObject.yd = cPos.y;
-
-            }
-        // AppLog::infoF("Remembering that this Eve has an Adam\n");
-        spawnTarget->hasAdam = true;
-    }
-    
-
-    int forceID = SettingsManager::getIntSetting( "forceEveObject", 0 );
-    
-    if( forceID > 0 ) {
-        // AppLog::infoF("Forcing Eve displayID\n");
-        newObject.displayID = forceID;
-        }
-    
-    
-    float forceAge = SettingsManager::getFloatSetting( "forceEveAge", 0.0 );
-    
-    if( forceAge > 0 ) {
-        // AppLog::infoF("Forcing Eve age\n");
-        newObject.lifeStartTimeSeconds = 
-            Time::getCurrentTime() - forceAge * ( 1.0 / getAgeRate() );
-        }
-    
-
-    newObject.holdingID = 0;
-
-
-    if( areTriggersEnabled() ) {
-        // AppLog::infoF("Triggers are enabled\n");
-        int id = getTriggerPlayerDisplayID( inEmail );
-        
-        if( id != -1 ) {
-            // AppLog::infoF("ID is not -1\n");
-            newObject.displayID = id;
-            
-            newObject.lifeStartTimeSeconds = 
-                Time::getCurrentTime() - 
-                getTriggerPlayerAge( inEmail ) * ( 1.0 / getAgeRate() );
-        
-            GridPos pos = getTriggerPlayerPos( inEmail );
-            
-            newObject.xd = pos.x;
-            newObject.yd = pos.y;
-            newObject.xs = pos.x;
-            newObject.ys = pos.y;
-            newObject.xd = pos.x;
-            
-            newObject.holdingID = getTriggerPlayerHolding( inEmail );
-            newObject.clothing = getTriggerPlayerClothing( inEmail );
-            }
-        }
-    
-    
     // AppLog::infoF("Setting new object values\n");
+    newObject.holdingID = 0;
     newObject.lineage = new SimpleVector<int>();
     
     newObject.name = NULL;
@@ -3637,7 +3195,416 @@ void processLoggedInPlayer( Socket *inSock,
     char *motherEmail = NULL;
     newObject.fatherID = -1;
 
-    if( spawnTarget != NULL && isFertileAge( spawnTarget ) && !newObject.isAdam ) {
+    int numPlayers = players.size();
+                            
+    SimpleVector<LiveObject*> motherChoices;
+    SimpleVector<LiveObject*> adultMales;
+    SimpleVector<LiveObject*> unmatchedEves;
+    
+
+    // lower the bad mother limit in low-population situations
+    // so that babies aren't stuck with the same low-skill mother over and
+    // over
+    int badMotherLimit = 2 + numPlayers / 3;
+
+    if( badMotherLimit > 10 ) {
+        badMotherLimit = 10;
+        }
+    
+    // with new birth cooldowns, we don't need bad mother limit anymore
+    // try making it a non-factor
+    badMotherLimit = 9999999;
+    
+    
+    primeLineageTest( numPlayers );
+
+    LiveObject *spawnTarget = NULL;
+    
+
+    for( int i=0; i<numPlayers; i++ ) {
+        LiveObject *player = players.getElement( i );
+        
+        if( player->error ) {
+            continue;
+            }
+
+        if( player->isEve && !player->hasAdam ) {
+            // AppLog::infoF("Player %d is an Eve with no Adam\n", player->id);
+            unmatchedEves.push_back( player );
+        }
+
+        if( isFatherAge( player ) ) {
+            // AppLog::infoF("Player %d is a male of age %d\n", player->id, computeAge( player ));
+            adultMales.push_back( player );
+        } else if( isFertileAge( player ) ) {
+            // AppLog::infoF("Player %d is a female of age %d\n", player->id, computeAge( player ));
+            // make sure this woman isn't on cooldown
+            // and that she's not a bad mother
+            char canHaveBaby = true;
+
+            
+            if( Time::timeSec() < player->birthCoolDown ) {
+                // AppLog::infoF("Player %d is on birth cooldown\n", player->id);
+                canHaveBaby = false;
+                }
+            
+            if( ! isLinePermitted( newObject.email, player->lineageEveID ) ) {
+                // this line forbidden for new player
+                continue;
+                }
+            
+
+            int numPastBabies = player->babyIDs->size();
+            
+            if( canHaveBaby && numPastBabies >= badMotherLimit ) {
+                int numDead = 0;
+                
+                for( int b=0; b < numPastBabies; b++ ) {
+                    
+                    int bID = 
+                        player->babyIDs->getElementDirect( b );
+
+                    char bAlive = false;
+                    
+                    for( int j=0; j<numPlayers; j++ ) {
+                        LiveObject *otherObj = players.getElement( j );
+                    
+                        if( otherObj->error ) {
+                            continue;
+                            }
+
+                        int id = otherObj->id;
+                    
+                        if( id == bID ) {
+                            bAlive = true;
+                            break;
+                            }
+                        }
+                    if( ! bAlive ) {
+                        numDead ++;
+                        }
+                    }
+                
+                if( numDead >= badMotherLimit ) {
+                    // this is a bad mother who lets all babies die
+                    // don't give them more babies
+                    // AppLog::infoF("Player %d is a bad mother\n", player->id);
+                    canHaveBaby = false;
+                    }
+                }
+            
+            if( canHaveBaby ) {
+                // AppLog::infoF("Player %d is a an eligible mother\n", player->id);
+                motherChoices.push_back( player );
+                }
+            }
+        }
+
+
+    if( unmatchedEves.size() > 0 ) {
+        // AppLog::infoF("There are %d unmatched Eves, spawning as an Adam\n", unmatchedEves.size());
+        // new Adam
+        // he starts almost full grown
+
+        newObject.isAdam = true;
+        newObject.lineageEveID = newObject.id;
+        
+        newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
+
+        
+        int maleID = getRandomMalePersonObject();
+        
+        if( maleID != -1 ) {
+            newObject.displayID = maleID;
+        }
+
+        // spawned next to random unmatched Eve
+        int spawnTargetIndex = 
+            randSource.getRandomBoundedInt( 0,
+                                            unmatchedEves.size() - 1 );
+        
+        spawnTarget = unmatchedEves.getElementDirect( spawnTargetIndex );
+        // AppLog::infoF("Spawning Adam next to %d\n", spawnTarget->id);
+
+        // AppLog::infoF("Spawning Adam next to Eve\n");
+        if( spawnTarget->xs == spawnTarget->xd && 
+            spawnTarget->ys == spawnTarget->yd ) {
+            // AppLog::infoF("Eve is not moving, spawning at her location\n");
+            // stationary mother
+            newObject.xs = spawnTarget->xs;
+            newObject.ys = spawnTarget->ys;
+                        
+            newObject.xd = spawnTarget->xs;
+            newObject.yd = spawnTarget->ys;
+            }
+        else {
+            // AppLog::infoF("Eve is moving, calculating her location\n");
+            // find where Eve is along path
+            GridPos cPos = computePartialMoveSpot( spawnTarget );
+                        
+            newObject.xs = cPos.x;
+            newObject.ys = cPos.y;
+                        
+            newObject.xd = cPos.x;
+            newObject.yd = cPos.y;
+
+            }
+        // AppLog::infoF("Remembering that this Eve has an Adam\n");
+        spawnTarget->hasAdam = true;
+
+    } else if( unmatchedEves.size() == 0 && motherChoices.size() > 0 ) {
+        // AppLog::infoF("Choosing a mother\n");
+        // baby
+        
+        // pick random mother from a weighted distribution based on 
+        // each mother's temperature
+
+        // and proximity to an adult male
+        
+        
+        // 0.5 temp is worth .5 weight
+        // 1.0 temp and 0 are worth 0 weight
+        
+        double totalTemp = 0;
+        
+        for( int i=0; i<motherChoices.size(); i++ ) {
+            LiveObject *p = motherChoices.getElementDirect( i );
+
+            p->distanceToClosestAdultMale = SettingsManager::getIntSetting( "fatherMaxDistance", 49 );
+            for( int j=0; j<adultMales.size(); j++ ) {
+                LiveObject *f = adultMales.getElementDirect( j );
+
+                double xdiff = (f->xs - p->xs);
+                double ydiff = (f->ys - p->ys);
+                double distance = sqrt( xdiff * xdiff + ydiff * ydiff );
+
+                // AppLog::infoF("Distance to %d is %d\n", f->id, distance);
+
+                if( distance < SettingsManager::getIntSetting( "fatherMinDistance", 10 ) ) {
+                    // within about a screen's distance, the chance is the same
+                    distance = SettingsManager::getIntSetting( "fatherMinDistance", 10 );
+                }
+
+                if( distance < p->distanceToClosestAdultMale || 
+                ( distance == p->distanceToClosestAdultMale && 
+                randSource.getRandomBoundedDouble(0, 1 ) > 0.5 ) ) {
+                    // this guy is closer or this guy is the same distance
+                    // and wins a coin toss
+                    p->distanceToClosestAdultMale = distance;
+                    p->closestAdultMaleID = f->id;
+                    // AppLog::infoF("Closest male is now %d at distance %d\n", f->id, distance);
+                }
+
+            }
+
+            double thisTemp = (0.5 - abs( p->heat - 0.5 )) * (SettingsManager::getIntSetting( "fatherMaxDistance", 50 ) + 1
+                - p->distanceToClosestAdultMale);
+            if( p->distanceToClosestAdultMale == SettingsManager::getIntSetting( "fatherMaxDistance", 50 ) ) {
+                thisTemp = 0;
+            }
+            totalTemp += thisTemp;
+            }
+
+        double choice = 
+            randSource.getRandomBoundedDouble( 0, totalTemp );
+        
+        // if there are no eligible fathers, don't choose a mother, which will mean spawning as an Eve
+        if( totalTemp > 0 ) {
+            totalTemp = 0;
+            
+            for( int i=0; i<motherChoices.size(); i++ ) {
+                LiveObject *p = motherChoices.getElementDirect( i );
+
+                double thisTemp = (0.5 - abs( p->heat - 0.5 )) * (SettingsManager::getIntSetting( "fatherMaxDistance", 50 ) + 1
+                    - p->distanceToClosestAdultMale);
+                if( p->distanceToClosestAdultMale == SettingsManager::getIntSetting( "fatherMaxDistance", 50 ) ) {
+                    thisTemp = 0;
+                }
+                totalTemp += thisTemp;
+                
+                if( totalTemp >= choice ) {
+                    spawnTarget = p;
+                    // AppLog::infoF("Choosing %d as mother\n", p->id);
+                    break;
+                    }
+                }
+            }
+        }
+
+    if( spawnTarget == NULL ) {
+        // AppLog::infoF("No eligibile mothers or no eligible fathers and no unmatched Eves, spawning as an Eve\n");
+        // new Eve
+        // she starts almost full grown
+
+        newObject.isEve = true;
+        
+        newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
+
+        
+        int femaleID = getRandomFemalePersonObject();
+        
+        if( femaleID != -1 ) {
+            newObject.displayID = femaleID;
+            }
+        
+        // AppLog::infoF("Spawning Eve at a new Eve location\n");
+        // else starts at civ outskirts (lone Eve)
+        int startX, startY;
+        getEvePosition( newObject.email, &startX, &startY );
+
+        if( SettingsManager::getIntSetting( "forceEveLocation", 0 ) ) {
+
+            startX = 
+                SettingsManager::getIntSetting( "forceEveLocationX", 0 );
+            startY = 
+                SettingsManager::getIntSetting( "forceEveLocationY", 0 );
+            }
+        
+        
+        newObject.xs = startX;
+        newObject.ys = startY;
+        
+        newObject.xd = startX;
+        newObject.yd = startY;    
+
+        int forceID = SettingsManager::getIntSetting( "forceEveObject", 0 );
+        
+        if( forceID > 0 ) {
+            // AppLog::infoF("Forcing Eve displayID\n");
+            newObject.displayID = forceID;
+            }
+        
+        
+        float forceAge = SettingsManager::getFloatSetting( "forceEveAge", 0.0 );
+        
+        if( forceAge > 0 ) {
+            // AppLog::infoF("Forcing Eve age\n");
+            newObject.lifeStartTimeSeconds = 
+                Time::getCurrentTime() - forceAge * ( 1.0 / getAgeRate() );
+            }
+        }
+
+    // else player starts as newborn
+    // start full up to capacity with food
+
+    if( ! newObject.isEve && ! newObject.isAdam ) {
+        // AppLog::infoF("Spawning as a baby\n");
+        // babies start out almost starving
+        newObject.foodStore = 2;
+        // AppLog::infoF("New player is a baby, choosing race and updating mother's food store\n");
+        // mother giving birth to baby
+        // take a ton out of her food store
+
+        int min = 4;
+        if( spawnTarget->foodStore < min ) {
+            min = spawnTarget->foodStore;
+            }
+        spawnTarget->foodStore -= babyBirthFoodDecrement;
+        if( spawnTarget->foodStore < min ) {
+            spawnTarget->foodStore = min;
+            }
+
+        spawnTarget->foodDecrementETASeconds +=
+            computeFoodDecrementTimeSeconds( spawnTarget );
+        
+        spawnTarget->foodUpdate = true;
+        
+
+        // only set race if the spawn-near player is our mother
+        // otherwise, we are a new Eve spawning next to a baby
+        
+        timeSec_t curTime = Time::timeSec();
+        
+        spawnTarget->babyBirthTimes->push_back( curTime );
+        spawnTarget->babyIDs->push_back( newObject.id );
+        
+        // set cool-down time before this worman can have another baby
+        spawnTarget->birthCoolDown = pickBirthCooldownSeconds() + curTime;
+
+        ObjectRecord *motherObject = getObject( spawnTarget->displayID );
+
+        // pick race of child
+        int numRaces;
+        int *races = getRaces( &numRaces );
+    
+        int motherRaceIndex = -1;
+        
+        for( int i=0; i<numRaces; i++ ) {
+            if( motherObject->race == races[i] ) {
+                motherRaceIndex = i;
+                break;
+                }
+            }
+        
+
+        if( motherRaceIndex != -1 ) {
+            
+            int childRace = motherObject->race;
+            
+            if( randSource.getRandomDouble() > childSameRaceLikelihood ) {
+                // different race than mother
+                
+                int offset = 1;
+                
+                if( randSource.getRandomBoolean() ) {
+                    offset = -1;
+                    }
+                int childRaceIndex = motherRaceIndex + offset;
+                
+                // don't wrap around
+                // but push in other direction instead
+                if( childRaceIndex >= numRaces ) {
+                    childRaceIndex = numRaces - 2;
+                    }
+                if( childRaceIndex < 0 ) {
+                    childRaceIndex = 1;
+                    }
+                
+                // stay in bounds
+                if( childRaceIndex >= numRaces ) {
+                    childRaceIndex = numRaces - 1;
+                    }
+                
+
+                childRace = races[ childRaceIndex ];
+                }
+            
+            if( childRace == motherObject->race ) {
+                newObject.displayID = getRandomFamilyMember( 
+                    motherObject->race, spawnTarget->displayID, familySpan );
+                }
+            else {
+                newObject.displayID = 
+                    getRandomPersonObjectOfRace( childRace );
+                }
+        
+            }
+    
+        delete [] races;
+        
+        if( spawnTarget->xs == spawnTarget->xd && 
+            spawnTarget->ys == spawnTarget->yd ) {
+            // AppLog::infoF("Mother is not moving, spawning baby at her location\n");
+
+            // stationary mother
+            newObject.xs = spawnTarget->xs;
+            newObject.ys = spawnTarget->ys;
+                        
+            newObject.xd = spawnTarget->xs;
+            newObject.yd = spawnTarget->ys;
+            }
+        else {
+            // find where mother is along path
+            // AppLog::infoF("Mother is moving, calculating location\n");
+            GridPos cPos = computePartialMoveSpot( spawnTarget );
+                        
+            newObject.xs = cPos.x;
+            newObject.ys = cPos.y;
+                        
+            newObject.xd = cPos.x;
+            newObject.yd = cPos.y;
+            }
+
         // AppLog::infoF("Setting new object's father and mother IDs\n");
         // do not log babies that new Eve spawns next to as mothers
         // or Eves that Adam spawns next to
@@ -3672,7 +3639,35 @@ void processLoggedInPlayer( Socket *inSock,
             }
 
         recordLineage( newObject.email, newObject.lineageEveID );
+
         }
+
+
+    if( areTriggersEnabled() ) {
+        // AppLog::infoF("Triggers are enabled\n");
+        int id = getTriggerPlayerDisplayID( inEmail );
+        
+        if( id != -1 ) {
+            // AppLog::infoF("ID is not -1\n");
+            newObject.displayID = id;
+            
+            newObject.lifeStartTimeSeconds = 
+                Time::getCurrentTime() - 
+                getTriggerPlayerAge( inEmail ) * ( 1.0 / getAgeRate() );
+        
+            GridPos pos = getTriggerPlayerPos( inEmail );
+            
+            newObject.xd = pos.x;
+            newObject.yd = pos.y;
+            newObject.xs = pos.x;
+            newObject.ys = pos.y;
+            newObject.xd = pos.x;
+            
+            newObject.holdingID = getTriggerPlayerHolding( inEmail );
+            newObject.clothing = getTriggerPlayerClothing( inEmail );
+            }
+        }
+    
 
     newObject.birthPos.x = newObject.xd;
     newObject.birthPos.y = newObject.yd;
