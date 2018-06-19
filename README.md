@@ -9,3 +9,5 @@ father: adds an Adam for every Eve and uses proximity to nearest adult male as a
 restrain: allows players to team up to overcome a lone opponent
 
 water: adds a water biome and procedurally generated streams
+
+birthcontrol: gives female players the ability to choose when to have a baby
