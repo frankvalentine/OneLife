@@ -16,9 +16,10 @@ fatherMinDistance: (default 10) all adult males within this proximity of a poten
 chance of being the father of the baby and being closer than this distance does not increase the chances
 of having a baby.
 
-fatherMaxDistance: (default 49) the distance beyond which all adult males are given the same minimum probability
-of being the father of the baby and being further than this distance does not decrease the chances of having
-a baby.
+fatherMaxDistance: (default 50) the distance at and beyond which all adult males are considered too far
+away to be the father of the baby. i.e. an adult male needs to be within this distance for a woman to
+be able to have a baby.
 
 The probability of having a baby is scaled between the minimum and maximum distance values. If there
-are no adult males on the server, then the next player will spawn as an Eve.
+are no adult males within range of a potential mother on the server, then the next player will spawn
+as an Eve.
