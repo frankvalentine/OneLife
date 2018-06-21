@@ -16,19 +16,30 @@ Version 112    ???
 
 --Hunger slips (and chimes) shown at 8 and 4 instead of 6 and 3 food remaining.
 
+--Mousing over wounded self now describes the wound.
+
 
 
 Server Fixes:
 
 --Keeping server database backups 7 days instead of 14.
 
---Lineage ban break for new players.  During the first two hours of play in the
-  game post-server-reset, the lineage ban does not apply, unless you are
-  murdered (then the ban applies to you in that family line regardless how
-  long you've been playing).
-
 --Fixed bug in setting decay ETA for newly held object.
 
+--Rework lineage ban.  Now it kicks in after you've lived 30 minutes total in a
+  given family line, and gets cleared when you've lived at least 60 minutes
+  total in other family lines.  Instantly kicks in if you get murdered,
+  regardless of how long you lived in that line so far.  Has very little
+  impact on dying babies, because they clock so little time before dying.
+  Thus, new players who die young a lot, and players who are abandonned as
+  babies, are not blocked from getting reborn in the same village.
+
+--Animal attacks now can set a wound on a player and put them into a dying
+  stagger just like murder.  No more instant death (except from hunger and old
+  age).
+
+--Getting attacked again while still wounded causes remaining stagger time to
+  be cut in half.
 
 
 
