@@ -5445,6 +5445,8 @@ int main() {
 
         SimpleVector<int> playerIndicesToSendDyingAbout;
 
+        SimpleVector<int> playerIndicesToSendHealingAbout;
+
         SimpleVector<GraveInfo> newGraves;
         SimpleVector<GraveMoveInfo> newGraveMoves;
 
@@ -5528,13 +5530,6 @@ int main() {
                         nextPlayer->dying = true;
                         nextPlayer->dyingETA = 
                             currentTime + staggerTime;
-                        
-                        // push next food decrement
-                        // way in the future so they
-                        // don't starve while staggering
-                        // around
-                        nextPlayer->foodDecrementETASeconds
-                            = currentTime + 2 * staggerTime;
 
                         playerIndicesToSendDyingAbout.
                             push_back( 
@@ -6406,14 +6401,6 @@ int main() {
                                             hitPlayer->dying = true;
                                             hitPlayer->dyingETA = 
                                                 currentTime + staggerTime;
-
-                                            // push next food decrement
-                                            // way in the future so they
-                                            // don't starve while staggering
-                                            // around
-                                            hitPlayer->foodDecrementETASeconds
-                                                = currentTime + 2 * staggerTime;
-                                            
 
                                             playerIndicesToSendDyingAbout.
                                                 push_back( 
@@ -7526,6 +7513,22 @@ int main() {
                                                       &hitIndex );
                                     }
                                 
+                                
+                                if( ( hitPlayer == NULL ||
+                                      hitPlayer == nextPlayer )
+                                    &&
+                                    ! holdingDrugs ) {
+                                    
+                                    // see if clicked-on player is dying
+                                    hitPlayer = 
+                                        getHitPlayer( m.x, m.y, false, -1, -1, 
+                                                      &hitIndex );
+                                    if( hitPlayer != NULL &&
+                                        ! hitPlayer->dying ) {
+                                        hitPlayer = NULL;
+                                        }
+                                    }
+                                
 
                                 if( hitPlayer != NULL &&
                                     hitPlayer != nextPlayer ) {
@@ -7549,7 +7552,78 @@ int main() {
                             nextPlayer->actionTarget.x = m.x;
                             nextPlayer->actionTarget.y = m.y;
                             
-                            if( nextPlayer->holdingID > 0 ) {
+
+                            if( targetPlayer != nextPlayer &&
+                                targetPlayer->dying &&
+                                ! holdingFood ) {
+                                
+                                // try healing wound
+                                    
+                                TransRecord *healTrans =
+                                    getTrans( nextPlayer->holdingID,
+                                              targetPlayer->holdingID );
+                                
+                                if( healTrans != NULL ) {
+                                    targetPlayer->holdingID =
+                                        healTrans->newTarget;
+                                    
+                                    // their wound has been changed
+                                    // no longer track embedded weapon
+                                    targetPlayer->embeddedWeaponID = 0;
+                                    targetPlayer->embeddedWeaponEtaDecay = 0;
+                                    
+                                    
+                                    nextPlayer->holdingID = 
+                                        healTrans->newActor;
+                                    
+                                    setFreshEtaDecayForHeld( 
+                                        nextPlayer );
+                                    setFreshEtaDecayForHeld( 
+                                        targetPlayer );
+                                    
+                                    nextPlayer->heldOriginValid = 0;
+                                    nextPlayer->heldOriginX = 0;
+                                    nextPlayer->heldOriginY = 0;
+                                    nextPlayer->heldTransitionSourceID = 
+                                        healTrans->target;
+                                    
+                                    targetPlayer->heldOriginValid = 0;
+                                    targetPlayer->heldOriginX = 0;
+                                    targetPlayer->heldOriginY = 0;
+                                    targetPlayer->heldTransitionSourceID = 
+                                        -1;
+                                    
+                                    if( targetPlayer->holdingID == 0 ) {
+                                        // not dying anymore
+                                        targetPlayer->dying = false;
+                                        targetPlayer->murderSourceID = 0;
+                                        targetPlayer->murderPerpID = 0;
+                                        if( targetPlayer->murderPerpEmail != 
+                                            NULL ) {
+                                            delete [] 
+                                                targetPlayer->murderPerpEmail;
+                                            targetPlayer->murderPerpEmail =
+                                                NULL;
+                                            }
+                                        
+                                        targetPlayer->deathSourceID = 0;
+                                        targetPlayer->holdingWound = false;
+                                        targetPlayer->customGraveID = -1;
+                                        
+                                        if( targetPlayer->deathReason 
+                                            != NULL ) {
+                                            delete [] targetPlayer->deathReason;
+                                            targetPlayer->deathReason = NULL;
+                                            }
+                                        
+                                        playerIndicesToSendHealingAbout.
+                                            push_back( 
+                                                getLiveObjectIndex( 
+                                                    targetPlayer->id ) );
+                                        }
+                                    }
+                                }
+                            else if( nextPlayer->holdingID > 0 ) {
                                 ObjectRecord *obj = 
                                     getObject( nextPlayer->holdingID );
                                 
@@ -9875,6 +9949,54 @@ int main() {
                     }
                 }
             }
+
+
+
+
+        unsigned char *healingMessage = NULL;
+        int healingMessageLength = 0;
+        
+        if( playerIndicesToSendHealingAbout.size() > 0 ) {
+            SimpleVector<char> healingWorking;
+            healingWorking.appendElementString( "HE\n" );
+            
+            int numAdded = 0;
+            for( int i=0; i<playerIndicesToSendHealingAbout.size(); i++ ) {
+                LiveObject *nextPlayer = players.getElement( 
+                    playerIndicesToSendHealingAbout.getElementDirect( i ) );
+
+                if( nextPlayer->error ) {
+                    continue;
+                    }
+
+                char *line = autoSprintf( "%d\n", nextPlayer->id );
+
+                numAdded++;
+                healingWorking.appendElementString( line );
+                delete [] line;
+                }
+            
+            healingWorking.push_back( '#' );
+            
+            if( numAdded > 0 ) {
+
+                char *healingMessageText = healingWorking.getElementString();
+                
+                healingMessageLength = strlen( healingMessageText );
+                
+                if( healingMessageLength < maxUncompressedSize ) {
+                    healingMessage = (unsigned char*)healingMessageText;
+                    }
+                else {
+                    // compress for all players once here
+                    healingMessage = makeCompressedMessage( 
+                        healingMessageText, 
+                        healingMessageLength, &healingMessageLength );
+                    
+                    delete [] healingMessageText;
+                    }
+                }
+            }
         
         
         // send moves and updates to clients
@@ -10352,6 +10474,24 @@ int main() {
                             false, false );
                     
                     if( numSent != dyingMessageLength ) {
+                        setDeathReason( nextPlayer, "disconnected" );
+
+                        nextPlayer->error = true;
+                        nextPlayer->errorCauseString =
+                            "Socket write failed";
+                        }
+                    }
+
+
+                // EVERYONE gets info about now-healed players           
+                if( healingMessage != NULL ) {
+                    int numSent = 
+                        nextPlayer->sock->send( 
+                            healingMessage, 
+                            healingMessageLength, 
+                            false, false );
+                    
+                    if( numSent != healingMessageLength ) {
                         setDeathReason( nextPlayer, "disconnected" );
 
                         nextPlayer->error = true;
@@ -10965,6 +11105,9 @@ int main() {
             }
         if( dyingMessage != NULL ) {
             delete [] dyingMessage;
+            }
+        if( healingMessage != NULL ) {
+            delete [] healingMessage;
             }
 
         
