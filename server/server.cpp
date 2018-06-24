@@ -187,7 +187,7 @@ typedef struct LiveObject {
 
         char isEve;
         char isAdam;
-        char hasAdam;
+        char hasEve;
 
         GridPos birthPos;
 
@@ -3127,7 +3127,7 @@ void processLoggedInPlayer( Socket *inSock,
     
     newObject.isEve = false;
     newObject.isAdam = false;
-    newObject.hasAdam = false;
+    newObject.hasEve = false;
 
     newObject.trueStartTimeSeconds = Time::getCurrentTime();
     newObject.lifeStartTimeSeconds = newObject.trueStartTimeSeconds;
@@ -3252,7 +3252,7 @@ void processLoggedInPlayer( Socket *inSock,
                             
     SimpleVector<LiveObject*> motherChoices;
     SimpleVector<LiveObject*> adultMales;
-    SimpleVector<LiveObject*> unmatchedEves;
+    SimpleVector<LiveObject*> unmatchedAdams;
     
 
     // lower the bad mother limit in low-population situations
@@ -3281,9 +3281,9 @@ void processLoggedInPlayer( Socket *inSock,
             continue;
             }
 
-        if( player->isEve && !player->hasAdam ) {
-            // AppLog::infoF("Player %d is an Eve with no Adam\n", player->id);
-            unmatchedEves.push_back( player );
+        if( player->isAdam && !player->hasEve ) {
+            // AppLog::infoF("Player %d is an Adam with no Eve\n", player->id);
+            unmatchedAdams.push_back( player );
         }
 
         if( isFatherAge( player ) ) {
@@ -3354,36 +3354,36 @@ void processLoggedInPlayer( Socket *inSock,
         }
 
 
-    if( unmatchedEves.size() > 0 ) {
-        // AppLog::infoF("There are %d unmatched Eves, spawning as an Adam\n", unmatchedEves.size());
-        // new Adam
-        // he starts almost full grown
+    if( unmatchedAdams.size() > 0 ) {
+        // AppLog::infoF("There are %d unmatched Adams, spawning as an Eve\n", unmatchedAdams.size());
+        // new Eve
+        // she starts almost full grown
 
-        newObject.isAdam = true;
+        newObject.isEve = true;
         newObject.lineageEveID = newObject.id;
         
         newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
 
         
-        int maleID = getRandomMalePersonObject();
+        int femaleID = getRandomFemalePersonObject();
         
-        if( maleID != -1 ) {
-            newObject.displayID = maleID;
+        if( femaleID != -1 ) {
+            newObject.displayID = femaleID;
         }
 
-        // spawned next to random unmatched Eve
+        // spawned next to random unmatched Adam
         int spawnTargetIndex = 
             randSource.getRandomBoundedInt( 0,
-                                            unmatchedEves.size() - 1 );
+                                            unmatchedAdams.size() - 1 );
         
-        spawnTarget = unmatchedEves.getElementDirect( spawnTargetIndex );
-        // AppLog::infoF("Spawning Adam next to %d\n", spawnTarget->id);
+        spawnTarget = unmatchedAdams.getElementDirect( spawnTargetIndex );
+        // AppLog::infoF("Spawning Eve next to %d\n", spawnTarget->id);
 
-        // AppLog::infoF("Spawning Adam next to Eve\n");
+        // AppLog::infoF("Spawning Eve next to Adam\n");
         if( spawnTarget->xs == spawnTarget->xd && 
             spawnTarget->ys == spawnTarget->yd ) {
-            // AppLog::infoF("Eve is not moving, spawning at her location\n");
-            // stationary mother
+            // AppLog::infoF("Adam is not moving, spawning at his location\n");
+            // stationary Adam
             newObject.xs = spawnTarget->xs;
             newObject.ys = spawnTarget->ys;
                         
@@ -3391,8 +3391,8 @@ void processLoggedInPlayer( Socket *inSock,
             newObject.yd = spawnTarget->ys;
             }
         else {
-            // AppLog::infoF("Eve is moving, calculating her location\n");
-            // find where Eve is along path
+            // AppLog::infoF("Adam is moving, calculating his location\n");
+            // find where Adam is along path
             GridPos cPos = computePartialMoveSpot( spawnTarget );
                         
             newObject.xs = cPos.x;
@@ -3402,10 +3402,10 @@ void processLoggedInPlayer( Socket *inSock,
             newObject.yd = cPos.y;
 
             }
-        // AppLog::infoF("Remembering that this Eve has an Adam\n");
-        spawnTarget->hasAdam = true;
+        // AppLog::infoF("Remembering that this Adam has an Eve\n");
+        spawnTarget->hasEve = true;
 
-    } else if( unmatchedEves.size() == 0 && motherChoices.size() > 0 ) {
+    } else if( unmatchedAdams.size() == 0 && motherChoices.size() > 0 ) {
         // AppLog::infoF("Choosing a mother\n");
         // baby
         
@@ -3461,7 +3461,7 @@ void processLoggedInPlayer( Socket *inSock,
         double choice = 
             randSource.getRandomBoundedDouble( 0, totalTemp );
         
-        // if there are no eligible fathers, don't choose a mother, which will mean spawning as an Eve
+        // if there are no eligible fathers, don't choose a mother, which will mean spawning as an Adam
         if( totalTemp > 0 ) {
             totalTemp = 0;
             
@@ -3485,23 +3485,23 @@ void processLoggedInPlayer( Socket *inSock,
         }
 
     if( spawnTarget == NULL ) {
-        // AppLog::infoF("No eligibile mothers or no eligible fathers and no unmatched Eves, spawning as an Eve\n");
-        // new Eve
-        // she starts almost full grown
+        // AppLog::infoF("No eligibile mothers or no eligible fathers and no unmatched Adams, spawning as an Adam\n");
+        // new Adam
+        // he starts almost full grown
 
-        newObject.isEve = true;
+        newObject.isAdam = true;
         
         newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
 
         
-        int femaleID = getRandomFemalePersonObject();
+        int maleID = getRandomMalePersonObject();
         
-        if( femaleID != -1 ) {
-            newObject.displayID = femaleID;
+        if( maleID != -1 ) {
+            newObject.displayID = maleID;
             }
         
-        // AppLog::infoF("Spawning Eve at a new Eve location\n");
-        // else starts at civ outskirts (lone Eve)
+        // AppLog::infoF("Spawning Adam at a new Adam location\n");
+        // else starts at civ outskirts (lone Adam)
         int startX, startY;
         getEvePosition( newObject.email, &startX, &startY );
 
@@ -3523,7 +3523,7 @@ void processLoggedInPlayer( Socket *inSock,
         int forceID = SettingsManager::getIntSetting( "forceEveObject", 0 );
         
         if( forceID > 0 ) {
-            // AppLog::infoF("Forcing Eve displayID\n");
+            // AppLog::infoF("Forcing Adam displayID\n");
             newObject.displayID = forceID;
             }
         
@@ -3531,7 +3531,7 @@ void processLoggedInPlayer( Socket *inSock,
         float forceAge = SettingsManager::getFloatSetting( "forceEveAge", 0.0 );
         
         if( forceAge > 0 ) {
-            // AppLog::infoF("Forcing Eve age\n");
+            // AppLog::infoF("Forcing Adam age\n");
             newObject.lifeStartTimeSeconds = 
                 Time::getCurrentTime() - forceAge * ( 1.0 / getAgeRate() );
             }
@@ -3691,7 +3691,6 @@ void processLoggedInPlayer( Socket *inSock,
                 spawnTarget->lineage->getElementDirect( i ) );
             }
 
-        recordLineage( newObject.email, newObject.lineageEveID );
 
         }
 

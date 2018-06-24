@@ -3,8 +3,8 @@ Fatherhood mod
 This mod adds proximity to adult males as a scalar for birth probability.
 This means that being near an adult male makes you more likely to have a baby and
 being far away from adult males means you are less likely
-It also adds Adam, who spawns next to an Eve so that she is not disadvantaged by
-being far away from men. Every Eve will have one Adam.
+It also adds Adam, who spawns first before Eve so that they are not disadvantaged by
+being far away from partners. Every Adam will have one Eve.
 
 It also refactors the lineage system to track father and mother relationship separately.
 If another player is related to the current player through both their mother and their father,
@@ -22,4 +22,6 @@ be able to have a baby.
 
 The probability of having a baby is scaled between the minimum and maximum distance values. If there
 are no adult males within range of a potential mother on the server, then the next player will spawn
-as an Eve.
+as an Adam.
+
+If there is an Adam that has not had an Eve spawned near him, then the next player will spawn as his Eve.
