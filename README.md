@@ -22,6 +22,11 @@ When this armour blocks an attack, there will be a chance for it to take damage,
 which will appear on the object, then the object will eventually be destroyed and
 no longer protect the wearer.
 
+The chance for a particular body part to be hit can be modified by giving an object a
+hitScalar=0.000000 line after the clothing=n line in the data file. This scales
+the chance for that body part to be hit. This is useful for making shields more likely
+to take the blow.
+
 To slow down attacks, a weapon could be made to turn into an undeadly version of itself
 which decays back into its useable version after a number of seconds. This can be used
 to make some weapons quicker than others, although it is limited to whole numbers

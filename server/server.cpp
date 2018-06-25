@@ -6431,45 +6431,45 @@ int main() {
                                         double totalPercentage = 0.0;
 
                                         double headHit = 5.0;
-                                        // if( nextPlayer->clothing.hat != NULL && nextPlayer->clothing.hat->hitScalar > 0 ) {
-                                        //     headHit *= nextPlayer->clothing.hat->hitScalar;
-                                        //     printf("Player is wearing a hat\n");
-                                        // }
+                                        if( nextPlayer->clothing.hat != NULL && nextPlayer->clothing.hat->hitScalar > 0.0 ) {
+                                            headHit *= nextPlayer->clothing.hat->hitScalar;
+                                            printf("Player is wearing a hat\n");
+                                        }
                                         totalPercentage += headHit;
 
                                         double chestHit = 35.0;
-                                        // if( nextPlayer->clothing.tunic != NULL && nextPlayer->clothing.tunic->hitScalar > 0 ) {
-                                        //     chestHit *= nextPlayer->clothing.tunic->hitScalar;
-                                        //     printf("Player is wearing a tunic\n");
-                                        // }
+                                        if( nextPlayer->clothing.tunic != NULL && nextPlayer->clothing.tunic->hitScalar > 0.0 ) {
+                                            chestHit *= nextPlayer->clothing.tunic->hitScalar;
+                                            printf("Player is wearing a tunic\n");
+                                        }
                                         totalPercentage += chestHit;
 
                                         double armsHit = 25.0;
-                                        // if( nextPlayer->clothing.backpack != NULL && nextPlayer->clothing.backpack->hitScalar > 0 ) {
-                                        //     armsHit *= nextPlayer->clothing.backpack->hitScalar;
-                                        //     printf("Player is wearing a shield\n");
-                                        // }
+                                        if( nextPlayer->clothing.backpack != NULL && nextPlayer->clothing.backpack->hitScalar > 0.0 ) {
+                                            armsHit *= nextPlayer->clothing.backpack->hitScalar;
+                                            printf("Player is wearing a shield\n");
+                                        }
                                         totalPercentage += armsHit;
 
                                         double groinHit = 15.0;
-                                        // if( nextPlayer->clothing.bottom != NULL && nextPlayer->clothing.bottom->hitScalar > 0 ) {
-                                        //     groinHit *= nextPlayer->clothing.bottom->hitScalar;
-                                        //     printf("Player is wearing faulds\n");
-                                        // }
+                                        if( nextPlayer->clothing.bottom != NULL && nextPlayer->clothing.bottom->hitScalar > 0.0 ) {
+                                            groinHit *= nextPlayer->clothing.bottom->hitScalar;
+                                            printf("Player is wearing faulds\n");
+                                        }
                                         totalPercentage += groinHit;
 
                                         double leftLegHit = 10.0;
-                                        // if( nextPlayer->clothing.frontShoe != NULL && nextPlayer->clothing.frontShoe->hitScalar > 0 ) {
-                                        //     leftLegHit *= nextPlayer->clothing.frontShoe->hitScalar;
-                                        //     printf("Player is wearing a left shoe\n");
-                                        // }
+                                        if( nextPlayer->clothing.frontShoe != NULL && nextPlayer->clothing.frontShoe->hitScalar > 0.0 ) {
+                                            leftLegHit *= nextPlayer->clothing.frontShoe->hitScalar;
+                                            printf("Player is wearing a left shoe\n");
+                                        }
                                         totalPercentage += leftLegHit;
 
                                         double rightLegHit = 10.0;
-                                        // if( nextPlayer->clothing.backShoe != NULL && nextPlayer->clothing.backShoe->hitScalar > 0 ) {
-                                        //     rightLegHit *= nextPlayer->clothing.backShoe->hitScalar;
-                                        //     printf("Player is wearing a right shoe\n");
-                                        // }
+                                        if( nextPlayer->clothing.backShoe != NULL && nextPlayer->clothing.backShoe->hitScalar > 0.0 ) {
+                                            rightLegHit *= nextPlayer->clothing.backShoe->hitScalar;
+                                            printf("Player is wearing a right shoe\n");
+                                        }
                                         totalPercentage += rightLegHit;
 
                                         double hitRand = randSource.getRandomDouble() * totalPercentage;
