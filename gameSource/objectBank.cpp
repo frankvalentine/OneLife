@@ -2663,7 +2663,7 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
         }
     objectLayerCutoff = -1;
     
-    if( inClothing.backpack != NULL && inClothing.backpack->hitScalar > 0 ) {
+    if( inClothing.backpack != NULL && inClothing.backpack->hitScalar > 0.0 ) {
         // shield behind everything
             
         // relative to body
@@ -2835,7 +2835,7 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
                 bottomPos = cPos;
                 bottomRot = inRot;
                 }
-            if( inClothing.backpack != NULL && inClothing.backpack->hitScalar == 0) {
+            if( inClothing.backpack != NULL && inClothing.backpack->hitScalar == 0.0 ) {
             
 
 
