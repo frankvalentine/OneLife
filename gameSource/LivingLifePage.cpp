@@ -726,6 +726,7 @@ typedef enum messageType {
     GRAVE,
     GRAVE_MOVE,
     COMPRESSED_MESSAGE,
+    SOUND,
     UNKNOWN
     } messageType;
 
@@ -807,6 +808,9 @@ messageType getMessageType( char *inMessage ) {
         }
     else if( strcmp( copy, "GM" ) == 0 ) {
         returnValue = GRAVE_MOVE;
+        }
+    else if( strcmp( copy, "SD" ) == 0 ) {
+        returnValue = SOUND;
         }
     
     delete [] copy;
@@ -12233,6 +12237,57 @@ void LivingLifePage::step() {
                             break;
                             }
                         }
+                    }
+                delete [] lines[i];
+                }
+            delete [] lines;
+            }
+        else if( type == SOUND ) {
+            int numLines;
+            char **lines = split( message, "\n", &numLines );
+            
+            if( numLines > 0 ) {
+                // skip first
+                delete [] lines[0];
+                }
+            
+            
+            for( int i=1; i<numLines; i++ ) {
+
+                int objectID;
+                int soundIndex;
+                int x;
+                int y;
+                int numRead = sscanf( lines[i], "%d %d %d %d",
+                                      &( objectID ), &( soundIndex ), &( x ), &( y ) );
+
+                if( numRead == 4 ) {
+                    ObjectRecord *soundObject = getObject( objectID );
+                    SoundUsage sound;
+                    switch( soundIndex ) {
+                        case 0:
+                            if( soundObject->creationSound.numSubSounds > 0 ) {
+                                sound = soundObject->creationSound;
+                            }
+                            break;
+                        case 1:
+                            if( soundObject->usingSound.numSubSounds > 0 ) {
+                                sound = soundObject->usingSound;
+                            }
+                            break;
+                        case 2:
+                            if( soundObject->eatingSound.numSubSounds > 0 ) {
+                                sound = soundObject->eatingSound;
+                            }
+                            break;
+                        case 3:
+                            if( soundObject->decaySound.numSubSounds > 0 ) {
+                                sound = soundObject->decaySound;
+                            }
+                            break;
+                        }
+                    playSound( sound, getVectorFromCamera( x, y ) );
+
                     }
                 delete [] lines[i];
                 }
