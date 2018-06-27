@@ -1,15 +1,19 @@
-Forked from jasonrohrer/OneLife
+Nations mod
 
-master branch is the foundation for all of the other mod branches:
+This mod allows for controlled spawning by assigning emails to nations.
+Nation names are defined in nationNames.ini with one nation name per line.
+Nation memberships are defined in nationMembers.ini with each line in the
+form of `example@email.com name of the nation`
 
-breastfeed: breastfeeding prevents pregnancy
+Nation spawn points are defined in nation#PositionX.ini and nation#PositionY.ini
+where # is the position in the nationNames.ini file, beginning, of course, at 0
+on the first line.
 
-father: adds an Adam for every Eve and uses proximity to nearest adult male as a scalar for birth probability
+New players will only be born to members of their own nations.
 
-restrain: allows players to team up to overcome a lone opponent
+If forceEveLocation is on, nation members spawning as Eves will spawn at their
+nation's location, defaulting to 0, 0 if this isn't set for their nation.
+Un-nationed players will spawn at the forceEveLocation settings.
 
-water: adds a water biome and procedurally generated streams
-
-birthcontrol: gives female players the ability to choose when to have a baby
-
-armour: clothing can be used to block attacks
+If forceEveLocation is off, all players spawning as Eve will be spawned in the
+spiral pattern.
