@@ -15,3 +15,5 @@ birthcontrol: gives female players the ability to choose when to have a baby
 armour: clothing can be used to block attacks
 
 nations: players can be assigned to nations, spawning only among their nation's people
+
+slowhunger: slows down hunger by a percentage when players are standing still
