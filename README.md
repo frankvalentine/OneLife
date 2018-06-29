@@ -1,27 +1,19 @@
-Fatherhood mod
+Forked from jasonrohrer/OneLife
 
-This mod adds proximity to adult males as a scalar for birth probability.
-This means that being near an adult male makes you more likely to have a baby and
-being far away from adult males means you are less likely
-It also adds Adam, who spawns first before Eve so that they are not disadvantaged by
-being far away from partners. Every Adam will have one Eve.
+master branch is the foundation for all of the other mod branches:
 
-It also refactors the lineage system to track father and mother relationship separately.
-If another player is related to the current player through both their mother and their father,
-the closest of the two relationships will be the one shown.
+breastfeed: breastfeeding prevents pregnancy
 
-There are two variables defined in the server/settings folder:
+father: adds an Adam for every Eve and uses proximity to nearest adult male as a scalar for birth probability
 
-fatherMinDistance: (default 10) all adult males within this proximity of a potential mother have the same
-chance of being the father of the baby and being closer than this distance does not increase the chances
-of having a baby.
+restrain: allows players to team up to overcome a lone opponent
 
-fatherMaxDistance: (default 50) the distance at and beyond which all adult males are considered too far
-away to be the father of the baby. i.e. an adult male needs to be within this distance for a woman to
-be able to have a baby.
+water: adds a water biome and procedurally generated streams
 
-The probability of having a baby is scaled between the minimum and maximum distance values. If there
-are no adult males within range of a potential mother on the server, then the next player will spawn
-as an Adam.
+birthcontrol: gives female players the ability to choose when to have a baby
 
-If there is an Adam that has not had an Eve spawned near him, then the next player will spawn as his Eve.
+armour: clothing can be used to block attacks
+
+nations: players can be assigned to nations, spawning only among their nation's people
+
+slowhunger: slows down hunger by a percentage when players are standing still
