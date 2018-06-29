@@ -42,6 +42,9 @@ static SimpleVector<int> personObjectIDs;
 // track female people
 static SimpleVector<int> femalePersonObjectIDs;
 
+// track female people
+static SimpleVector<int> malePersonObjectIDs;
+
 // track monument calls
 static SimpleVector<int> monumentCallObjectIDs;
 
@@ -440,6 +443,21 @@ float initObjectBankStep() {
 
                 next++;
 
+                r->waterObject = false;
+                
+                if( strstr( lines[next], "waterObject=" ) != NULL ) {
+                    // water object flag present
+                    
+                    int waterObjectRead = 0;
+                    sscanf( lines[next], "waterObject=%d", &( waterObjectRead ) );
+                    
+                    if( waterObjectRead == 1 ) {
+                        r->waterObject = true;
+                    }
+                    
+                    next++;
+                    }
+
 
                 r->heatValue = 0;                            
                 sscanf( lines[next], "heatValue=%d", 
@@ -593,6 +611,16 @@ float initObjectBankStep() {
                         &( r->deadlyDistance ) );
                             
                 next++;
+                
+                r->stunDistance = 0;
+
+                if( strstr( lines[next], 
+                            "stunDistance=" ) != NULL ) {
+                    sscanf( lines[next], "stunDistance=%d", 
+                            &( r->stunDistance ) );
+                                
+                    next++;
+                    }
                 
                 
                 r->useDistance = 1;
@@ -928,6 +956,8 @@ float initObjectBankStep() {
                     
                     if( ! r->male ) {
                         femalePersonObjectIDs.push_back( r->id );
+                        } else {
+                            malePersonObjectIDs.push_back( r->id );
                         }
 
                     if( r->race <= MAX_RACE ) {
@@ -1555,6 +1585,7 @@ static void freeObjectRecord( int inID ) {
 
             personObjectIDs.deleteElementEqualTo( inID );
             femalePersonObjectIDs.deleteElementEqualTo( inID );
+            malePersonObjectIDs.deleteElementEqualTo( inID );
             monumentCallObjectIDs.deleteElementEqualTo( inID );
             deathMarkerObjectIDs.deleteElementEqualTo( inID );
             
@@ -1629,6 +1660,7 @@ void freeObjectBank() {
 
     personObjectIDs.deleteAll();
     femalePersonObjectIDs.deleteAll();
+    malePersonObjectIDs.deleteAll();
     monumentCallObjectIDs.deleteAll();
     deathMarkerObjectIDs.deleteAll();
     
@@ -1666,6 +1698,7 @@ int reAddObject( ObjectRecord *inObject,
                         inObject->drawBehindPlayer,
                         biomeString,
                         inObject->mapChance,
+                        inObject->waterObject,
                         inObject->heatValue,
                         inObject->rValue,
                         inObject->person,
@@ -1683,6 +1716,7 @@ int reAddObject( ObjectRecord *inObject,
                         1.0,
                         inObject->clothingOffset,
                         inObject->deadlyDistance,
+                        inObject->stunDistance,
                         inObject->useDistance,
                         inObject->creationSound,
                         inObject->usingSound,
@@ -1932,6 +1966,7 @@ int addObject( const char *inDescription,
                char inDrawBehindPlayer,
                char *inBiomes,
                float inMapChance,
+               char inWaterObject,
                int inHeatValue,
                float inRValue,
                char inPerson,
@@ -1949,6 +1984,7 @@ int addObject( const char *inDescription,
                float inHitScalar,
                doublePair inClothingOffset,
                int inDeadlyDistance,
+               int inStunDistance,
                int inUseDistance,
                SoundUsage inCreationSound,
                SoundUsage inUsingSound,
@@ -2077,7 +2113,9 @@ int addObject( const char *inDescription,
         
         lines.push_back( autoSprintf( "mapChance=%f#biomes_%s", 
                                       inMapChance, inBiomes ) );
-        
+
+        lines.push_back( autoSprintf( "waterObject=%d", inWaterObject ) );
+
         lines.push_back( autoSprintf( "heatValue=%d", inHeatValue ) );
         lines.push_back( autoSprintf( "rValue=%f", inRValue ) );
 
@@ -2112,6 +2150,9 @@ int addObject( const char *inDescription,
 
         lines.push_back( autoSprintf( "deadlyDistance=%d", 
                                       inDeadlyDistance ) );
+
+        lines.push_back( autoSprintf( "stunDistance=%d", 
+                                      inStunDistance ) );
 
         lines.push_back( autoSprintf( "useDistance=%d", 
                                       inUseDistance ) );
@@ -2340,7 +2381,9 @@ int addObject( const char *inDescription,
     
     
     r->mapChance = inMapChance;
-    
+
+    r->waterObject = inWaterObject;
+
     r->heatValue = inHeatValue;
     r->rValue = inRValue;
 
@@ -2366,6 +2409,7 @@ int addObject( const char *inDescription,
     r->hitScalar = inHitScalar;
     r->clothingOffset = inClothingOffset;
     r->deadlyDistance = inDeadlyDistance;
+    r->stunDistance = inStunDistance;
     r->useDistance = inUseDistance;
     r->creationSound = copyUsage( inCreationSound );
     r->usingSound = copyUsage( inUsingSound );
@@ -2546,6 +2590,7 @@ int addObject( const char *inDescription,
     
     personObjectIDs.deleteElementEqualTo( newID );
     femalePersonObjectIDs.deleteElementEqualTo( newID );
+    malePersonObjectIDs.deleteElementEqualTo( newID );
 
     for( int i=0; i<=MAX_RACE; i++ ) {
         racePersonObjectIDs[ i ].deleteElementEqualTo( newID );
@@ -2556,6 +2601,8 @@ int addObject( const char *inDescription,
         
         if( ! r->male ) {
             femalePersonObjectIDs.push_back( newID );
+            } else {
+                malePersonObjectIDs.push_back( newID );
             }
         
         
@@ -2602,7 +2649,7 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
                        char inHeldNotInPlaceYet,
                        ClothingSet inClothing,
                        double inScale ) {
-    
+
     HoldingPos returnHoldingPos = { false, {0, 0}, 0 };
     
     SimpleVector <int> frontArmIndices;
@@ -2680,32 +2727,14 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
         }
 
 
-    int i;
-    char reverseOrder = false;
-    if( inObject->clothing == 'p' && inObject->hitScalar > 0.0 ) {
-        i = limit - 1;
-        reverseOrder = true;
-    } else {
-        i = 0;
-    }
-    while( i >= 0 && i < limit ) {
+    for( int i = 0; i < limit; i++ ) {
         if( inObject->spriteSkipDrawing != NULL &&
             inObject->spriteSkipDrawing[i] ) {
-            if( reverseOrder ) {
-                i--;
-                } else {
-                i++;
-                }
             continue;
             }
         if( inObject->person &&
             ! isSpriteVisibleAtAge( inObject, i, inAge ) ) {    
             // skip drawing this aging layer entirely
-            if( reverseOrder ) {
-                i--;
-                } else {
-                i++;
-                }
             continue;
             }
         if( inObject->clothing != 'n' && 
@@ -2715,21 +2744,11 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
                 inObject->spriteInvisibleWhenWorn[i] == 1 ) {
         
                 // skip invisible layer in worn clothing
-                if( reverseOrder ) {
-                    i--;
-                    } else {
-                    i++;
-                    }
                 continue;
                 }
             else if( ! inWorn &&
                      inObject->spriteInvisibleWhenWorn[i] == 2 ) {
                 // skip invisible layer in unworn clothing
-                if( reverseOrder ) {
-                    i--;
-                    } else {
-                    i++;
-                    }
                 continue;
                 }
             }
@@ -2738,20 +2757,10 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
         if( inDrawBehindSlots != 2 ) {    
             if( inDrawBehindSlots == 0 && 
                 ! inObject->spriteBehindSlots[i] ) {
-                if( reverseOrder ) {
-                    i--;
-                    } else {
-                    i++;
-                    }
                 continue;
                 }
             else if( inDrawBehindSlots == 1 && 
                      inObject->spriteBehindSlots[i] ) {
-                if( reverseOrder ) {
-                    i--;
-                    } else {
-                    i++;
-                    }
                 continue;
                 }
             }
@@ -2999,11 +3008,6 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
                         inFlipH, -1, 0, false, false, emptyClothing );
             }
 
-        if( reverseOrder ) {
-            i--;
-            } else {
-            i++;
-            }
         }    
 
     
@@ -3036,7 +3040,7 @@ HoldingPos drawObject( ObjectRecord *inObject, doublePair inPos, double inRot,
                        ClothingSet inClothing,
                        int inNumContained, int *inContainedIDs,
                        SimpleVector<int> *inSubContained ) {
-    
+
     drawObject( inObject, 0, inPos, inRot, inWorn, inFlipH, inAge, 
                 inHideClosestArm,
                 inHideAllLimbs,
@@ -3277,6 +3281,17 @@ int getRandomFemalePersonObject() {
                                         femalePersonObjectIDs.size() - 1  ) );
     }
 
+int getRandomMalePersonObject() {
+    
+    if( malePersonObjectIDs.size() == 0 ) {
+        return -1;
+        }
+    
+        
+    return malePersonObjectIDs.getElementDirect( 
+        randSource.getRandomBoundedInt( 0, 
+                                        malePersonObjectIDs.size() - 1  ) );
+    }
 
 int *getRaces( int *outNumRaces ) {
     *outNumRaces = raceList.size();
