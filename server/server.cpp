@@ -5668,7 +5668,6 @@ int main() {
                             armourSound.soundIndex = 2;
                             armourSound.x = nextPlayer->xd;
                             armourSound.y = nextPlayer->yd;
-                            soundsToSend.push_back( armourSound );
 
 
                             switch( hitLocation ) {
@@ -5677,6 +5676,7 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.hat = getObject( armourTrans->newTarget );
+                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 't':
@@ -5684,6 +5684,7 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.tunic = getObject( armourTrans->newTarget );
+                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 'p':
@@ -5691,6 +5692,7 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.backpack = getObject( armourTrans->newTarget );
+                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 'b':
@@ -5698,6 +5700,7 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.bottom = getObject( armourTrans->newTarget );
+                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 'l':
@@ -5705,6 +5708,7 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.frontShoe = getObject( armourTrans->newTarget );
+                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 'r':
@@ -5712,9 +5716,11 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.backShoe = getObject( armourTrans->newTarget );
+                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                             }
+                            soundsToSend.push_back( armourSound );
                         } else {
                             // proceed with the kill code
                             performKill = true;
@@ -6677,7 +6683,6 @@ int main() {
                                         attackSound.soundIndex = 1;
                                         attackSound.x = nextPlayer->xd;
                                         attackSound.y = nextPlayer->yd;
-                                        soundsToSend.push_back( attackSound );
 
                                         // check if hitPlayer is wearing armour in hit location
                                         if( hitArmour != NULL ) {
@@ -6700,6 +6705,7 @@ int main() {
                                                 if( armourTrans->newActor != nextPlayer->holdingID ) {
                                                     playerIndicesToSendUpdatesAbout.push_back(
                                                         getLiveObjectIndex( nextPlayer->id ) );
+                                                    attackSound.soundIndex = 3;
                                                 }
                                                 nextPlayer->holdingID = armourTrans->newActor;
                                                 switch( hitLocation ) {
@@ -6750,6 +6756,7 @@ int main() {
                                                 // proceed with the kill code
                                                 performKill = true;
                                             }
+                                        soundsToSend.push_back( attackSound );
                                         } else {
                                             // proceed with the kill code
                                             performKill = true;
