@@ -5772,6 +5772,7 @@ int main() {
                             armourSound.soundIndex = 2;
                             armourSound.x = nextPlayer->xd;
                             armourSound.y = nextPlayer->yd;
+                            soundsToSend.push_back( armourSound );
 
 
                             switch( hitLocation ) {
@@ -5780,7 +5781,6 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.hat = getObject( armourTrans->newTarget );
-                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 't':
@@ -5788,7 +5788,6 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.tunic = getObject( armourTrans->newTarget );
-                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 'p':
@@ -5796,7 +5795,6 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.backpack = getObject( armourTrans->newTarget );
-                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 'b':
@@ -5804,7 +5802,6 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.bottom = getObject( armourTrans->newTarget );
-                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 'l':
@@ -5812,7 +5809,6 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.frontShoe = getObject( armourTrans->newTarget );
-                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                                 case 'r':
@@ -5820,11 +5816,9 @@ int main() {
                                         playerIndicesToSendUpdatesAbout.push_back(
                                             getLiveObjectIndex( nextPlayer->id ) );
                                         nextPlayer->clothing.backShoe = getObject( armourTrans->newTarget );
-                                        armourSound.soundIndex = 3;
                                     }
                                     break;
                             }
-                            soundsToSend.push_back( armourSound );
                         } else {
                             // proceed with the kill code
                             performKill = true;
@@ -6699,6 +6693,7 @@ int main() {
                                         getHitPlayer( m.x, m.y, true );
                                     
                                     char someoneHit = false;
+                                    char performKill = false;
 
                                     if( hitPlayer != NULL ) {
                                         someoneHit = true;
@@ -6706,6 +6701,7 @@ int main() {
                                         double totalPercentage = 0.0;
 
                                         double headHit = 5.0;
+                                        headHit = 0.0;
                                         if( hitPlayer->clothing.hat != NULL && hitPlayer->clothing.hat->hitScalar > 0.0 ) {
                                             headHit *= hitPlayer->clothing.hat->hitScalar;
                                             // printf("Player is wearing a hat\n");
@@ -6713,6 +6709,7 @@ int main() {
                                         totalPercentage += headHit;
 
                                         double chestHit = 45.0;
+                                        chestHit = 0.0;
                                         if( hitPlayer->clothing.tunic != NULL && hitPlayer->clothing.tunic->hitScalar > 0.0 ) {
                                             chestHit *= hitPlayer->clothing.tunic->hitScalar;
                                             // printf("Player is wearing a tunic\n");
@@ -6727,6 +6724,7 @@ int main() {
                                         totalPercentage += armsHit;
 
                                         double groinHit = 15.0;
+                                        groinHit = 0.0;
                                         if( hitPlayer->clothing.bottom != NULL && hitPlayer->clothing.bottom->hitScalar > 0.0 ) {
                                             groinHit *= hitPlayer->clothing.bottom->hitScalar;
                                             // printf("Player is wearing faulds\n");
@@ -6734,6 +6732,7 @@ int main() {
                                         totalPercentage += groinHit;
 
                                         double leftLegHit = 10.0;
+                                        leftLegHit = 0.0;
                                         if( hitPlayer->clothing.frontShoe != NULL && hitPlayer->clothing.frontShoe->hitScalar > 0.0 ) {
                                             leftLegHit *= hitPlayer->clothing.frontShoe->hitScalar;
                                             // printf("Player is wearing a left shoe\n");
@@ -6741,6 +6740,7 @@ int main() {
                                         totalPercentage += leftLegHit;
 
                                         double rightLegHit = 10.0;
+                                        rightLegHit = 0.0;
                                         if( hitPlayer->clothing.backShoe != NULL && hitPlayer->clothing.backShoe->hitScalar > 0.0 ) {
                                             rightLegHit *= hitPlayer->clothing.backShoe->hitScalar;
                                             // printf("Player is wearing a right shoe\n");
@@ -6780,13 +6780,13 @@ int main() {
                                                 hitRand, totalPercentage );
                                         }
 
-                                        char performKill = false;
 
                                         SoundLocation attackSound;
                                         attackSound.objectID = nextPlayer->holdingID;
                                         attackSound.soundIndex = 1;
                                         attackSound.x = nextPlayer->xd;
                                         attackSound.y = nextPlayer->yd;
+                                        soundsToSend.push_back( attackSound );
 
                                         // check if hitPlayer is wearing armour in hit location
                                         if( hitArmour != NULL ) {
@@ -6797,7 +6797,7 @@ int main() {
                                                         hitArmour->id, false, false );
                                             if( armourTrans != NULL ) {
                                                 // perform the transition
-                                                // printf("This armour blocks this weapon\n");
+                                                AppLog::info("KILL attempt blocked\n");
                                                 
                                                 SoundLocation armourSound;
                                                 armourSound.objectID = hitArmour->id;
@@ -6809,15 +6809,27 @@ int main() {
                                                 if( armourTrans->newActor != nextPlayer->holdingID ) {
                                                     playerIndicesToSendUpdatesAbout.push_back(
                                                         getLiveObjectIndex( nextPlayer->id ) );
-                                                    attackSound.soundIndex = 3;
+                                                    // SoundLocation attackBreakSound;
+                                                    // attackBreakSound.objectID = nextPlayer->holdingID;
+                                                    // attackBreakSound.soundIndex = 3;
+                                                    // attackBreakSound.x = nextPlayer->xd;
+                                                    // attackBreakSound.y = nextPlayer->yd;
+                                                    // soundsToSend.push_back( attackBreakSound );
+                                                    nextPlayer->holdingID = armourTrans->newActor;
                                                 }
-                                                nextPlayer->holdingID = armourTrans->newActor;
+
                                                 switch( hitLocation ) {
                                                     case 'h':
                                                         if( armourTrans->newTarget != hitPlayer->clothing.hat->id ) {
                                                             playerIndicesToSendUpdatesAbout.push_back(
                                                                 getLiveObjectIndex( hitPlayer->id ) );
                                                             hitPlayer->clothing.hat = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
                                                         }
                                                         break;
                                                     case 't':
@@ -6825,6 +6837,12 @@ int main() {
                                                             playerIndicesToSendUpdatesAbout.push_back(
                                                                 getLiveObjectIndex( hitPlayer->id ) );
                                                             hitPlayer->clothing.tunic = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
                                                         }
                                                         break;
                                                     case 'p':
@@ -6832,6 +6850,12 @@ int main() {
                                                             playerIndicesToSendUpdatesAbout.push_back(
                                                                 getLiveObjectIndex( hitPlayer->id ) );
                                                             hitPlayer->clothing.backpack = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
                                                         }
                                                         break;
                                                     case 'b':
@@ -6839,6 +6863,12 @@ int main() {
                                                             playerIndicesToSendUpdatesAbout.push_back(
                                                                 getLiveObjectIndex( hitPlayer->id ) );
                                                             hitPlayer->clothing.bottom = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
                                                         }
                                                         break;
                                                     case 'l':
@@ -6846,6 +6876,12 @@ int main() {
                                                             playerIndicesToSendUpdatesAbout.push_back(
                                                                 getLiveObjectIndex( hitPlayer->id ) );
                                                             hitPlayer->clothing.frontShoe = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
                                                         }
                                                         break;
                                                     case 'r':
@@ -6853,6 +6889,12 @@ int main() {
                                                             playerIndicesToSendUpdatesAbout.push_back(
                                                                 getLiveObjectIndex( hitPlayer->id ) );
                                                             hitPlayer->clothing.backShoe = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
                                                         }
                                                         break;
                                                 }
@@ -6860,7 +6902,6 @@ int main() {
                                                 // proceed with the kill code
                                                 performKill = true;
                                             }
-                                        soundsToSend.push_back( attackSound );
                                         } else {
                                             // proceed with the kill code
                                             performKill = true;
@@ -6877,9 +6918,9 @@ int main() {
                                             
                                             hitPlayer->murderPerpID =
                                                 nextPlayer->id;
-                                            
-                                        // brand this player as a murderer
-                                        nextPlayer->everKilledOther = true;
+
+                                            // brand this player as a murderer
+                                            nextPlayer->everKilledOther = true;
 
                                             if( hitPlayer->murderPerpEmail 
                                                 != NULL ) {
@@ -6927,12 +6968,12 @@ int main() {
                                                     Time::getCurrentTime();
                                                 
                                                 double staggerTimeLeft = 
-                                                 hitPlayer->dyingETA - 
+                                                    hitPlayer->dyingETA - 
                                                     currentTime;
                             
                                                 if( staggerTimeLeft > 0 ) {
                                                     staggerTimeLeft /= 2;
-                                                 hitPlayer->dyingETA = 
+                                                    hitPlayer->dyingETA = 
                                                         currentTime + 
                                                         staggerTimeLeft;
                                                     }
@@ -6956,6 +6997,7 @@ int main() {
                                     TransRecord *rHit = NULL;
                                     
                                     if( someoneHit ) {
+                                        printf("Someone was hit\n");
                                         // last use on target specifies
                                         // grave and weapon change on hit
                                         // non-last use (r above) specifies
@@ -6966,7 +7008,7 @@ int main() {
                                                       0, false, true );
                                         
                                         if( rHit != NULL &&
-                                            rHit->newTarget > 0 ) {
+                                            rHit->newTarget > 0 && performKill ) {
                                             hitPlayer->customGraveID = 
                                                 rHit->newTarget;
                                             }
@@ -6978,11 +7020,18 @@ int main() {
                                                       0, true, false );
                                         
                                         if( woundHit != NULL &&
-                                            woundHit->newTarget > 0 ) {
+                                            woundHit->newTarget > 0 && performKill ) {
+                                            printf("There is a wound transition producing a %s\n", getObject( woundHit->newTarget )->description );
                                             
+                                            if( hitPlayer->holdingWound ) {
+                                                printf("Player is holding a wound\n");
+                                            } else {
+                                                printf("Player is not holding a wound\n");
+                                            }
                                             // don't drop their wound
                                             if( hitPlayer->holdingID != 0 &&
                                                 ! hitPlayer->holdingWound ) {
+                                                printf("Handling the drop\n");
                                                 handleDrop( 
                                                     m.x, m.y, 
                                                     hitPlayer,
@@ -6991,6 +7040,7 @@ int main() {
                                             hitPlayer->holdingID = 
                                                 woundHit->newTarget;
                                             hitPlayer->holdingWound = true;
+                                            printf("Player is now holding the wound\n");
                                             
                                             playerIndicesToSendUpdatesAbout.
                                                 push_back( 
@@ -7031,7 +7081,7 @@ int main() {
                                     if( r != NULL ) {
                                     
                                         if( hitPlayer != NULL &&
-                                            r->newTarget != 0 ) {
+                                            r->newTarget != 0 && performKill ) {
                                         
                                             hitPlayer->embeddedWeaponID = 
                                                 r->newTarget;
@@ -7065,7 +7115,7 @@ int main() {
                                                     }
                                                 }
                                             }
-                                        else if( hitPlayer == NULL &&
+                                        else if( ( hitPlayer == NULL || !performKill ) &&
                                                  isMapSpotEmpty( m.x, 
                                                                  m.y ) ) {
                                             // no player hit, and target ground
