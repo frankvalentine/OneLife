@@ -111,7 +111,7 @@ static char savingSpeech = false;
 static char savingSpeechColor = false;
 static char savingSpeechMask = false;
 
-
+static double deathAge = 120.0;
 
 
 // most recent home at end
@@ -4950,7 +4950,7 @@ void LivingLifePage::draw( doublePair inViewCenter,
 
                         // vary by a tiny amount, so we don't change
                         // the way they are sorted relative to other objects
-                        depth += ( 60.0 - o->age ) / 6000.0;
+                        depth += ( deathAge - o->age ) / 6000.0;
                         }
                     
                     drawQueue.insert( drawRec, depth );
@@ -13717,7 +13717,7 @@ void LivingLifePage::step() {
                         mHungerSlipVisible = 0;
                         }
                     else if( ourLiveObject->foodStore <= 4 &&
-                             computeCurrentAge( ourLiveObject ) < 57 ) {
+                             computeCurrentAge( ourLiveObject ) < ( deathAge - 3 ) ) {
                         
                         // don't play hunger sounds at end of life
                         // because it interrupts our end-of-life song
@@ -13753,7 +13753,7 @@ void LivingLifePage::step() {
                         }
 
                     if( ourLiveObject->foodStore > 4 ||
-                        computeCurrentAge( ourLiveObject ) >= 57 ) {
+                        computeCurrentAge( ourLiveObject ) >= ( deathAge - 3 ) ) {
                         // restore music
                         setMusicLoudness( musicLoudness );
                         

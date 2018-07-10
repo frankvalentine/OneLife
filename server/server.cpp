@@ -74,7 +74,7 @@ int minPickupBabyAge = 10;
 
 int babyAge = 5;
 
-double forceDeathAge = 60;
+double forceDeathAge = 120;
 
 
 double minSayGapInSeconds = 1.0;
@@ -1476,8 +1476,8 @@ int computeFoodCapacity( LiveObject *inPlayer ) {
         return ageInYears + 4;
         }
     else {
-        // food capacity decreases as we near 60
-        int cap = 60 - ageInYears + 4;
+        // food capacity decreases as we near death
+        int cap = forceDeathAge - ageInYears + 4;
         
         if( cap < 4 ) {
             cap = 4;
@@ -5196,9 +5196,9 @@ int main() {
     initTransBankFinish();
     
 
-    // defaults to one hour
+    // defaults to two hours
     int epochSeconds = 
-        SettingsManager::getIntSetting( "epochSeconds", 3600 );
+        SettingsManager::getIntSetting( "epochSeconds", 7200 );
     
     setTransitionEpoch( epochSeconds );
 

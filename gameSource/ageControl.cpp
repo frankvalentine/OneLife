@@ -11,6 +11,12 @@ static double oldHeadDownFactor = 0.35;
 
 static double oldHeadForwardFactor = 2;
 
+static double deathAge = 120.0;
+
+static double adultAge = 20.0;
+
+static double oldAge = 100.0;
+
 
 #include "minorGems/util/SettingsManager.h"
 
@@ -40,33 +46,33 @@ doublePair getAgeHeadOffset( double inAge, doublePair inHeadSpritePos,
         return (doublePair){ 0, 0 };
         }
     
-    if( inAge < 20 ) {
+    if( inAge < adultAge ) {
         
         double maxHead = inHeadSpritePos.y - inBodySpritePos.y;
         
-        double yOffset = ( ( 20 - inAge ) / 20 ) * babyHeadDownFactor * maxHead;
+        double yOffset = ( ( adultAge - inAge ) / adultAge ) * babyHeadDownFactor * maxHead;
         
         
         return (doublePair){ 0, round( -yOffset ) };
         }
     
 
-    if( inAge >= 40 ) {
+    if( inAge >= oldAge ) {
         
-        if( inAge > 60 ) {
-            // no worse after 60
-            inAge = 60;
+        if( inAge > deathAge ) {
+            // no worse after 120
+            inAge = deathAge;
             }
 
         double maxHead = inHeadSpritePos.y - inBodySpritePos.y;
         
         double vertOffset = 
-            ( ( inAge - 40 ) / 20 ) * oldHeadDownFactor * maxHead;
+            ( ( inAge - oldAge ) / adultAge ) * oldHeadDownFactor * maxHead;
         
         double footOffset = inFrontFootSpritePos.x - inHeadSpritePos.x;
         
         double forwardOffset = 
-            ( ( inAge - 40 ) / 20 ) * oldHeadForwardFactor * footOffset;
+            ( ( inAge - oldAge ) / adultAge ) * oldHeadForwardFactor * footOffset;
 
         return (doublePair){ round( forwardOffset ), round( -vertOffset ) };
         }
@@ -81,11 +87,11 @@ doublePair getAgeBodyOffset( double inAge, doublePair inBodySpritePos ) {
         return (doublePair){ 0, 0 };
         }
     
-    if( inAge < 20 ) {
+    if( inAge < adultAge ) {
         
         double maxBody = inBodySpritePos.y;
         
-        double yOffset = ( ( 20 - inAge ) / 20 ) * babyBodyDownFactor * maxBody;
+        double yOffset = ( ( adultAge - inAge ) / adultAge ) * babyBodyDownFactor * maxBody;
         
         
         return (doublePair){ 0, round( -yOffset ) };
