@@ -3490,13 +3490,13 @@ void processLoggedInPlayer( Socket *inSock,
 
     newObject.clothing = getEmptyClothingSet();
     // this is to make people spawn with clothes, for testing of weapons and armour
-    // newObject.clothing.hat = getObject( 199 );
-    // newObject.clothing.tunic = getObject( 202 );
-    newObject.clothing.backpack = getObject( 86115 );
-    // newObject.clothing.bottom = getObject( 200 );
-    // newObject.clothing.frontShoe = getObject( 203 );
-    // newObject.clothing.backShoe = getObject( 203 );
-    newObject.holdingID = 86122;
+    // newObject.clothing.hat = getObject( 86782 );
+    // newObject.clothing.tunic = getObject( 86778 );
+    // newObject.clothing.backpack = getObject( 86115 );
+    // newObject.clothing.bottom = getObject( 86716 );
+    // newObject.clothing.frontShoe = getObject( 87803 );
+    // newObject.clothing.backShoe = getObject( 87803 );
+    // newObject.holdingID = 86122;
 
     for( int c=0; c<NUM_CLOTHING_PIECES; c++ ) {
         newObject.clothingEtaDecay[c] = 0;
@@ -3764,7 +3764,7 @@ void processLoggedInPlayer( Socket *inSock,
         }
     
 
-    // newObject.holdingID = 0;
+    newObject.holdingID = 0;
 
 
     if( areTriggersEnabled() ) {
