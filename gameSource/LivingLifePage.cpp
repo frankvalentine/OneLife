@@ -826,7 +826,7 @@ messageType getMessageType( char *inMessage ) {
     else if( strcmp( copy, "SD" ) == 0 ) {
         returnValue = FORCED_SHUTDOWN;
         }
-    else if( strcmp( copy, "SN" ) == 0 ) {
+    else if( strcmp( copy, "SND" ) == 0 ) {
         returnValue = SOUND;
         }
     

@@ -3492,10 +3492,11 @@ void processLoggedInPlayer( Socket *inSock,
     // this is to make people spawn with clothes, for testing of weapons and armour
     // newObject.clothing.hat = getObject( 199 );
     // newObject.clothing.tunic = getObject( 202 );
-    // newObject.clothing.backpack = getObject( 198 );
+    newObject.clothing.backpack = getObject( 86115 );
     // newObject.clothing.bottom = getObject( 200 );
     // newObject.clothing.frontShoe = getObject( 203 );
     // newObject.clothing.backShoe = getObject( 203 );
+    newObject.holdingID = 86122;
 
     for( int c=0; c<NUM_CLOTHING_PIECES; c++ ) {
         newObject.clothingEtaDecay[c] = 0;
@@ -3763,7 +3764,7 @@ void processLoggedInPlayer( Socket *inSock,
         }
     
 
-    newObject.holdingID = 0;
+    // newObject.holdingID = 0;
 
 
     if( areTriggersEnabled() ) {
@@ -11013,7 +11014,7 @@ int main() {
         
         if( soundsToSend.size() > 0 ) {
             SimpleVector<char> soundWorking;
-            soundWorking.appendElementString( "SN\n" );
+            soundWorking.appendElementString( "SND\n" );
             
             int numAdded = 0;
             for( int i=0; i<soundsToSend.size(); i++ ) {
