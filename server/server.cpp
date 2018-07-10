@@ -134,6 +134,7 @@ static int familySpan = 2;
 // phrases that trigger baby and family naming
 static SimpleVector<char*> nameGivingPhrases;
 static SimpleVector<char*> familyNameGivingPhrases;
+static SimpleVector<char*> nationNames;
 static SimpleVector<char*> cursingPhrases;
 
 static char *eveName = NULL;
@@ -178,6 +179,8 @@ SimpleVector<FreshConnection> newConnections;
 
 typedef struct LiveObject {
         char *email;
+
+        int nation;
         
         int id;
         
@@ -877,6 +880,9 @@ void quitCleanup() {
 
     nameGivingPhrases.deallocateStringElements();
     familyNameGivingPhrases.deallocateStringElements();
+    nationNames.deallocateStringElements();
+    // nationMembers.deallocateStringElements();
+    
     cursingPhrases.deallocateStringElements();
 
     if( eveName != NULL ) {
@@ -3164,9 +3170,46 @@ static LiveObject *getHitPlayer( int inX, int inY,
     return hitPlayer;
     }
 
-    
+
+char *getNationName( char *inEmail, SimpleVector<char*> *inMemberList ) {
+    for( int i=0; i<inMemberList->size(); i++ ) {
+        char *email = stringToUpperCase( inEmail );
+        char *testString = inMemberList->getElementDirect( i );
+
+        if( strstr( testString, email ) == testString ) {
+            // hit
+            int phraseLen = strlen( email );
+            // skip spaces after
+            while( testString[ phraseLen ] == ' ' ) {
+                phraseLen++;
+                }
+            return &( testString[ phraseLen ] );
+            }
+        }
+    return NULL;
+    }
 
 
+int getNation( char *inEmail, SimpleVector<char*> *inMemberList ) {
+    char *nationName = getNationName( inEmail, inMemberList );
+    if( nationName == NULL ) {
+        return -1;
+    }
+
+    for( int i=0; i<nationNames.size(); i++ ) {
+        if( strstr( nationName, nationNames.getElementDirect( i ) ) == nationName ) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void getNationPosition( int inNation, int *outX, int *outY ) {
+    char *fileName = autoSprintf( "nation%dPositionX", inNation );
+    *outX = SettingsManager::getIntSetting( fileName, 0 );
+    fileName = autoSprintf( "nation%dPositionY", inNation );
+    *outY = SettingsManager::getIntSetting( fileName, 0 );
+}
 
 // for placement of tutorials out of the way 
 static int maxPlacementX = 5000000;
@@ -3175,6 +3218,28 @@ static int maxPlacementX = 5000000;
 static int tutorialCount = 0;
 
         
+
+void readNameGivingPhrases( const char *inSettingsName, 
+                            SimpleVector<char*> *inList ) {
+    char *cont = SettingsManager::getSettingContents( inSettingsName, "" );
+    
+    if( strcmp( cont, "" ) == 0 ) {
+        delete [] cont;
+        return;    
+        }
+    
+    int numParts;
+    char **parts = split( cont, "\n", &numParts );
+    delete [] cont;
+    
+    for( int i=0; i<numParts; i++ ) {
+        if( strcmp( parts[i], "" ) != 0 ) {
+            inList->push_back( stringToUpperCase( parts[i] ) );
+            }
+        delete [] parts[i];
+        }
+    delete [] parts;
+    }
 
 
 void processLoggedInPlayer( Socket *inSock,
@@ -3204,6 +3269,15 @@ void processLoggedInPlayer( Socket *inSock,
     LiveObject newObject;
 
     newObject.email = inEmail;
+
+    SimpleVector<char*> nationMembers;
+
+    readNameGivingPhrases( "nationMembers", &nationMembers );
+
+    newObject.nation = getNation( inEmail, &nationMembers );
+    printf("Player is in nation %d %s\n", newObject.nation, getNationName( inEmail, &nationMembers ));
+
+    nationMembers.deallocateStringElements();
     
     newObject.id = nextID;
     nextID++;
@@ -3282,6 +3356,10 @@ void processLoggedInPlayer( Socket *inSock,
             
             if( ! isLinePermitted( newObject.email, player->lineageEveID ) ) {
                 // this line forbidden for new player
+                continue;
+                }
+            if( player->nation != newObject.nation ) {
+                // can only be born in the same nation
                 continue;
                 }
             
@@ -3367,7 +3445,7 @@ void processLoggedInPlayer( Socket *inSock,
                 continue;
                 }
 
-            if( computeAge( player ) < babyAge ) {
+            if( computeAge( player ) < babyAge && player->nation == newObject.nation ) {
                 parentChoices.push_back( player );
                 }
             }
@@ -3640,17 +3718,23 @@ void processLoggedInPlayer( Socket *inSock,
         newObject.isTutorial = false;
         
         // else starts at civ outskirts (lone Eve)
-        int startX, startY;
-        getEvePosition( newObject.email, &startX, &startY );
+        int startX = 0;
+        int startY = 0;
+
 
         if( SettingsManager::getIntSetting( "forceEveLocation", 0 ) ) {
-
-            startX = 
-                SettingsManager::getIntSetting( "forceEveLocationX", 0 );
-            startY = 
-                SettingsManager::getIntSetting( "forceEveLocationY", 0 );
+            if( newObject.nation == -1 ) {
+                startX = 
+                    SettingsManager::getIntSetting( "forceEveLocationX", 0 );
+                startY = 
+                    SettingsManager::getIntSetting( "forceEveLocationY", 0 );
+                } else {
+                    getNationPosition( newObject.nation, &startX, &startY );
+                }
             }
-        
+            else {
+                getEvePosition( newObject.email, &startX, &startY );
+            }        
         
         newObject.xs = startX;
         newObject.ys = startY;
@@ -5047,6 +5131,14 @@ int main() {
         SettingsManager::getIntSetting( "familySpan", 2 );
     
     
+    readNameGivingPhrases( "babyNamingPhrases", &nameGivingPhrases );
+    readNameGivingPhrases( "familyNamingPhrases", &familyNameGivingPhrases );
+    readNameGivingPhrases( "nationNames", &nationNames );
+
+    printf("Nations are:\n");
+    for(int i=0; i<nationNames.size(); i++ ) {
+        printf("%s\n", nationNames.getElementDirect( i ) );
+    }
     readPhrases( "babyNamingPhrases", &nameGivingPhrases );
     readPhrases( "familyNamingPhrases", &familyNameGivingPhrases );
 
@@ -5125,7 +5217,7 @@ int main() {
     
     SocketPoll sockPoll;
     
-    
+
     
     SocketServer server( port, 256 );
     
