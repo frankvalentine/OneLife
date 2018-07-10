@@ -1281,6 +1281,21 @@ GridPos computePartialMoveSpot( LiveObject *inPlayer ) {
 
 
 
+GridPos getPlayerPos( LiveObject *inPlayer ) {
+    if( inPlayer->xs == inPlayer->xd &&
+        inPlayer->ys == inPlayer->yd ) {
+        
+        GridPos cPos = { inPlayer->xs, inPlayer->ys };
+        
+        return cPos;
+        }
+    else {
+        return computePartialMoveSpot( inPlayer );
+        }
+    }
+
+
+
 GridPos killPlayer( const char *inEmail ) {
     for( int i=0; i<players.size(); i++ ) {
         LiveObject *o = players.getElement( i );
@@ -4838,6 +4853,86 @@ void monumentStep() {
 
 
 
+// inPlayerName may be destroyed inside this function
+// returns a uniquified name, sometimes newly allocated.
+// return value destroyed by caller
+char *getUniqueCursableName( char *inPlayerName ) {
+    
+    char dup = isNameDuplicateForCurses( inPlayerName );
+    
+    if( ! dup ) {
+        return inPlayerName;
+        }
+    else {
+        
+        int targetPersonNumber = 1;
+        
+        char *fullName = stringDuplicate( inPlayerName );
+
+        while( dup ) {
+            // try next roman numeral
+            targetPersonNumber++;
+            
+            int personNumber = targetPersonNumber;            
+        
+            SimpleVector<char> romanNumeralList;
+        
+            while( personNumber >= 100 ) {
+                romanNumeralList.push_back( 'C' );
+                personNumber -= 100;
+                }
+            while( personNumber >= 50 ) {
+                romanNumeralList.push_back( 'L' );
+                personNumber -= 50;
+                }
+            while( personNumber >= 40 ) {
+                romanNumeralList.push_back( 'X' );
+                romanNumeralList.push_back( 'L' );
+                personNumber -= 40;
+                }
+            while( personNumber >= 10 ) {
+                romanNumeralList.push_back( 'X' );
+                personNumber -= 10;
+                }
+            while( personNumber >= 9 ) {
+                romanNumeralList.push_back( 'I' );
+                romanNumeralList.push_back( 'X' );
+                personNumber -= 9;
+                }
+            while( personNumber >= 5 ) {
+                romanNumeralList.push_back( 'V' );
+                personNumber -= 5;
+                }
+            while( personNumber >= 4 ) {
+                romanNumeralList.push_back( 'I' );
+                romanNumeralList.push_back( 'V' );
+                personNumber -= 4;
+                }
+            while( personNumber >= 1 ) {
+                romanNumeralList.push_back( 'I' );
+                personNumber -= 1;
+                }
+            
+            char *romanString = romanNumeralList.getElementString();
+
+            delete [] fullName;
+            
+            fullName = autoSprintf( "%s %s", inPlayerName, romanString );
+            delete [] romanString;
+            
+            dup = isNameDuplicateForCurses( fullName );
+            }
+        
+        delete [] inPlayerName;
+        
+        return fullName;
+        }
+    
+    }
+
+
+
+
 int main() {
 
     memset( allowedSayCharMap, false, 256 );
@@ -6547,6 +6642,9 @@ int main() {
                                 nextPlayer->name = autoSprintf( "%s %s",
                                                                 eveName, 
                                                                 close );
+                                nextPlayer->name = getUniqueCursableName( 
+                                    nextPlayer->name );
+
                                 logName( nextPlayer->id,
                                          nextPlayer->email,
                                          nextPlayer->name );
@@ -6554,12 +6652,11 @@ int main() {
                                 }
                             }
 
-                        if( nextPlayer->holdingID < 0 &&
-                            nextPlayer->babyIDs->size() > 0 &&
-                            nextPlayer->babyIDs->getElementIndex(
-                                - nextPlayer->holdingID ) != -1 ) {
+                        if( nextPlayer->holdingID < 0 ) {
 
-                            // we're holding one of our babies
+                            // we're holding a baby
+                            // (no longer matters if it's our own baby)
+                            // (we let adoptive parents name too)
                             
                             LiveObject *babyO =
                                 getLiveObject( - nextPlayer->holdingID );
@@ -6583,12 +6680,86 @@ int main() {
                                     babyO->name = autoSprintf( "%s%s",
                                                                close, 
                                                                lastName );
+
+                                    int spaceCount = 0;
+                                    int lastSpaceIndex = -1;
+
+                                    int nameLen = strlen( babyO->name );
+                                    for( int s=0; s<nameLen; s++ ) {
+                                        if( babyO->name[s] == ' ' ) {
+                                            lastSpaceIndex = s;
+                                            spaceCount++;
+                                            }
+                                        }
+                                    
+                                    if( spaceCount > 1 ) {
+                                        // remove suffix from end
+                                        babyO->name[ lastSpaceIndex ] = '\0';
+                                        }
+                                    
+                                    babyO->name = getUniqueCursableName( 
+                                        babyO->name );
+                                    
                                     logName( babyO->id,
                                              babyO->email,
                                              babyO->name );
                                     
                                     playerIndicesToSendNamesAbout.push_back( 
                                         getLiveObjectIndex( babyO->id ) );
+                                    }
+                                }
+                            }
+                        else {
+                            // not holding anyone
+                        
+                            char *name = isBabyNamingSay( m.saidText );
+                                
+                            if( name != NULL && strcmp( name, "" ) != 0 ) {
+                                // still, check if we're naming a nearby,
+                                // nameless non-baby
+                                GridPos thisPos = getPlayerPos( nextPlayer );
+                                
+                                // don't consider anyone who is too far away
+                                double closestDist = 20;
+                                LiveObject *closestOther = NULL;
+                                
+                                for( int j=0; j<numLive; j++ ) {
+                                    LiveObject *otherPlayer = 
+                                        players.getElement(j);
+                                    
+                                    if( otherPlayer != nextPlayer &&
+                                        computeAge( otherPlayer ) >= babyAge &&
+                                        otherPlayer->name == NULL ) {
+                                        
+                                        GridPos otherPos = 
+                                            getPlayerPos( otherPlayer );
+                                        
+                                        double dist =
+                                            distance( thisPos, otherPos );
+                                        
+                                        if( dist < closestDist ) {
+                                            closestDist = dist;
+                                            closestOther = otherPlayer;
+                                            }
+                                        }
+                                    }
+                                if( closestOther != NULL ) {
+                                    const char *close = 
+                                        findCloseFirstName( name );
+                                    
+                                    closestOther->name = 
+                                        stringDuplicate( close );
+                                    
+                                    closestOther->name = getUniqueCursableName( 
+                                        closestOther->name );
+
+                                    logName( closestOther->id,
+                                             closestOther->email,
+                                             closestOther->name );
+                                    
+                                    playerIndicesToSendNamesAbout.push_back( 
+                                        getLiveObjectIndex( 
+                                            closestOther->id ) );
                                     }
                                 }
                             }
@@ -7611,7 +7782,7 @@ int main() {
 
                                 // is anyone there?
                                 LiveObject *hitPlayer = 
-                                    getHitPlayer( m.x, m.y, false, 5 );
+                                    getHitPlayer( m.x, m.y, false, babyAge );
                                 
                                 if( hitPlayer != NULL &&
                                     !hitPlayer->heldByOther &&
@@ -7778,7 +7949,8 @@ int main() {
                                 int hitIndex;
                                 LiveObject *hitPlayer = 
                                     getHitPlayer( m.x, m.y, 
-                                                  false, 5, -1, &hitIndex );
+                                                  false, 
+                                                  babyAge, -1, &hitIndex );
                                 
                                 if( hitPlayer != NULL && holdingDrugs ) {
                                     // can't even feed baby drugs
