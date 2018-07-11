@@ -138,6 +138,7 @@ static SimpleVector<char*> nationNames;
 static SimpleVector<char*> cursingPhrases;
 
 static char *eveName = NULL;
+static char *adamName = NULL;
 
 
 // maps extended ascii codes to true/false for characters allowed in SAY
@@ -191,22 +192,25 @@ typedef struct LiveObject {
 
         char *lastSay;
 
+        char isEve;
+        char isAdam;
+        char hasEve;
         int curseLevel;
         
         int curseTokenCount;
         char curseTokenUpdate;
 
-
-        char isEve;        
-
         char isTutorial;
 
         GridPos birthPos;
 
-        int parentID;
+        int motherID;
+        int fatherID;
+        int closestAdultMaleID;
+        double distanceToClosestAdultMale;
 
         // 0 for Eve
-        int parentChainLength;
+        int motherChainLength;
 
         SimpleVector<int> *lineage;
         
@@ -890,6 +894,11 @@ void quitCleanup() {
         eveName = NULL;
         }
 
+    if( adamName != NULL ) {
+        delete [] adamName;
+        adamName = NULL;
+        }
+
     if( apocalypseRequest != NULL ) {
         delete apocalypseRequest;
         apocalypseRequest = NULL;
@@ -1389,8 +1398,8 @@ int longestShutdownLine = -1;
 
 void handleShutdownDeath( LiveObject *inPlayer,
                           int inX, int inY ) {
-    if( inPlayer->parentChainLength > longestShutdownLine ) {
-        longestShutdownLine = inPlayer->parentChainLength;
+    if( inPlayer->motherChainLength > longestShutdownLine ) {
+        longestShutdownLine = inPlayer->motherChainLength;
         
         FILE *f = fopen( "shutdownLongLineagePos.txt", "w" );
         if( f != NULL ) {
@@ -1421,7 +1430,7 @@ double computeAge( LiveObject *inPlayer ) {
 int getSayLimit( LiveObject *inPlayer ) {
     int limit = (unsigned int)( floor( computeAge( inPlayer ) ) + 1 );
 
-    if( inPlayer->isEve && limit < 30 ) {
+    if( (inPlayer->isEve || inPlayer->isAdam) && limit < 30 ) {
         // give Eve room to name her family line
         limit = 30;
         }
@@ -1461,8 +1470,18 @@ char isFertileAge( LiveObject *inPlayer ) {
         }
     }
 
-
-
+char isFatherAge( LiveObject *inPlayer ) {
+    double age = computeAge( inPlayer );
+                    
+    char f = getFemale( inPlayer );
+                    
+    if( age >= 14 && !f ) {
+        return true;
+        }
+    else {
+        return false;
+        }
+    }
 
 int computeFoodCapacity( LiveObject *inPlayer ) {
     int ageInYears = lrint( computeAge( inPlayer ) );
@@ -3217,7 +3236,83 @@ static int maxPlacementX = 5000000;
 // each subsequent tutorial gets put in a diferent place
 static int tutorialCount = 0;
 
+
+// inPlayerName may be destroyed inside this function
+// returns a uniquified name, sometimes newly allocated.
+// return value destroyed by caller
+char *getUniqueCursableName( char *inPlayerName ) {
+    
+    char dup = isNameDuplicateForCurses( inPlayerName );
+    
+    if( ! dup ) {
+        return inPlayerName;
+        }
+    else {
         
+        int targetPersonNumber = 1;
+        
+        char *fullName = stringDuplicate( inPlayerName );
+
+        while( dup ) {
+            // try next roman numeral
+            targetPersonNumber++;
+            
+            int personNumber = targetPersonNumber;            
+        
+            SimpleVector<char> romanNumeralList;
+        
+            while( personNumber >= 100 ) {
+                romanNumeralList.push_back( 'C' );
+                personNumber -= 100;
+                }
+            while( personNumber >= 50 ) {
+                romanNumeralList.push_back( 'L' );
+                personNumber -= 50;
+                }
+            while( personNumber >= 40 ) {
+                romanNumeralList.push_back( 'X' );
+                romanNumeralList.push_back( 'L' );
+                personNumber -= 40;
+                }
+            while( personNumber >= 10 ) {
+                romanNumeralList.push_back( 'X' );
+                personNumber -= 10;
+                }
+            while( personNumber >= 9 ) {
+                romanNumeralList.push_back( 'I' );
+                romanNumeralList.push_back( 'X' );
+                personNumber -= 9;
+                }
+            while( personNumber >= 5 ) {
+                romanNumeralList.push_back( 'V' );
+                personNumber -= 5;
+                }
+            while( personNumber >= 4 ) {
+                romanNumeralList.push_back( 'I' );
+                romanNumeralList.push_back( 'V' );
+                personNumber -= 4;
+                }
+            while( personNumber >= 1 ) {
+                romanNumeralList.push_back( 'I' );
+                personNumber -= 1;
+                }
+            
+            char *romanString = romanNumeralList.getElementString();
+
+            delete [] fullName;
+            
+            fullName = autoSprintf( "%s %s", inPlayerName, romanString );
+            delete [] romanString;
+            
+            dup = isNameDuplicateForCurses( fullName );
+            }
+        
+        delete [] inPlayerName;
+        
+        return fullName;
+        }
+    
+    }
 
 void readNameGivingPhrases( const char *inSettingsName, 
                             SimpleVector<char*> *inList ) {
@@ -3268,6 +3363,8 @@ void processLoggedInPlayer( Socket *inSock,
                 
     LiveObject newObject;
 
+    printf("Setting new player properties\n");
+
     newObject.email = inEmail;
 
     SimpleVector<char*> nationMembers;
@@ -3282,6 +3379,8 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.id = nextID;
     nextID++;
 
+    // AppLog::infoF("New player %s logging in, given id %d\n", newObject.email, newObject.id);
+
     SettingsManager::setSetting( "nextPlayerID",
                                  (int)nextID );
 
@@ -3291,195 +3390,26 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.displayID = getRandomPersonObject();
     
     newObject.isEve = false;
+    newObject.isAdam = false;
+    newObject.hasEve = false;
     
     newObject.isTutorial = false;
     
     if( inTutorialNumber > 0 ) {
+        printf("New player needs to complete the tutorial\n");
         newObject.isTutorial = true;
         }
 
     newObject.trueStartTimeSeconds = Time::getCurrentTime();
     newObject.lifeStartTimeSeconds = newObject.trueStartTimeSeconds;
                             
-
     newObject.lastSayTimeSeconds = Time::getCurrentTime();
-    
 
     newObject.heldByOther = false;
-                            
-    int numOfAge = 0;
-                            
-    int numPlayers = players.size();
-                            
-    SimpleVector<LiveObject*> parentChoices;
-    
-
-    // lower the bad mother limit in low-population situations
-    // so that babies aren't stuck with the same low-skill mother over and
-    // over
-    int badMotherLimit = 2 + numPlayers / 3;
-
-    if( badMotherLimit > 10 ) {
-        badMotherLimit = 10;
-        }
-    
-    // with new birth cooldowns, we don't need bad mother limit anymore
-    // try making it a non-factor
-    badMotherLimit = 9999999;
-    
-    
-    primeLineageTest( numPlayers );
-    
-
-    for( int i=0; i<numPlayers; i++ ) {
-        LiveObject *player = players.getElement( i );
-        
-        if( player->error ) {
-            continue;
-            }
-
-        if( player->isTutorial ) {
-            continue;
-            }
-
-        if( isFertileAge( player ) ) {
-            numOfAge ++;
-            
-            // make sure this woman isn't on cooldown
-            // and that she's not a bad mother
-            char canHaveBaby = true;
-
-            
-            if( Time::timeSec() < player->birthCoolDown ) {    
-                canHaveBaby = false;
-                }
-            
-            if( ! isLinePermitted( newObject.email, player->lineageEveID ) ) {
-                // this line forbidden for new player
-                continue;
-                }
-            if( player->nation != newObject.nation ) {
-                // can only be born in the same nation
-                continue;
-                }
-            
-
-            int numPastBabies = player->babyIDs->size();
-            
-            if( canHaveBaby && numPastBabies >= badMotherLimit ) {
-                int numDead = 0;
-                
-                for( int b=0; b < numPastBabies; b++ ) {
-                    
-                    int bID = 
-                        player->babyIDs->getElementDirect( b );
-
-                    char bAlive = false;
-                    
-                    for( int j=0; j<numPlayers; j++ ) {
-                        LiveObject *otherObj = players.getElement( j );
-                    
-                        if( otherObj->error ) {
-                            continue;
-                            }
-
-                        int id = otherObj->id;
-                    
-                        if( id == bID ) {
-                            bAlive = true;
-                            break;
-                            }
-                        }
-                    if( ! bAlive ) {
-                        numDead ++;
-                        }
-                    }
-                
-                if( numDead >= badMotherLimit ) {
-                    // this is a bad mother who lets all babies die
-                    // don't give them more babies
-                    canHaveBaby = false;
-                    }
-                }
-            
-            if( canHaveBaby ) {
-                parentChoices.push_back( player );
-                }
-            }
-        }
-
-
-    if( inTutorialNumber > 0 ) {
-        // Tutorial always played full-grown
-        parentChoices.deleteAll();
-        }
-
-
-    newObject.parentChainLength = 1;
-
-    if( parentChoices.size() == 0 || numOfAge == 0 ) {
-        // new Eve
-        // she starts almost full grown
-
-        newObject.isEve = true;
-        newObject.lineageEveID = newObject.id;
-        
-        newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
-
-        
-        int femaleID = getRandomFemalePersonObject();
-        
-        if( femaleID != -1 ) {
-            newObject.displayID = femaleID;
-            }
-        }
-    
-
-    if( numOfAge == 0 ) {
-        // all existing babies are good spawn spot for Eve
-                    
-        for( int i=0; i<numPlayers; i++ ) {
-            LiveObject *player = players.getElement( i );
-            
-            if( player->error ) {
-                continue;
-                }
-
-            if( computeAge( player ) < babyAge && player->nation == newObject.nation ) {
-                parentChoices.push_back( player );
-                }
-            }
-        }
-    else {
-        // testing
-        //newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
-        }
-    
-                
-    // else player starts as newborn
-                
-
-    // start full up to capacity with food
-    newObject.foodStore = computeFoodCapacity( &newObject );
-
-    if( ! newObject.isEve ) {
-        // babies start out almost starving
-        newObject.foodStore = 2;
-        }
-    
-    if( newObject.isTutorial && newObject.foodStore > 10 ) {
-        // so they can practice eating at the beginning of the tutorial
-        newObject.foodStore -= 6;
-        }
-    
-
+    newObject.motherChainLength = 1;
 
     newObject.heat = 0.5;
 
-    newObject.foodDecrementETASeconds =
-        Time::getCurrentTime() + 
-        computeFoodDecrementTimeSeconds( &newObject );
-                
     newObject.foodUpdate = true;
     newObject.lastAteID = 0;
     newObject.lastAteFillMax = 0;
@@ -3487,6 +3417,8 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.justAteID = 0;
     
     newObject.yummyBonusStore = 0;
+
+    newObject.clothing = getEmptyClothingSet();
 
     newObject.clothing = getEmptyClothingSet();
     // this is to make people spawn with clothes, for testing of weapons and armour
@@ -3508,291 +3440,11 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.yd = 0;
     
     newObject.lastRegionLookTime = 0;
-    
-    
-    LiveObject *parent = NULL;
-
-    char placed = false;
-    
-    if( parentChoices.size() > 0 ) {
-        placed = true;
-        
-        if( newObject.isEve ) {
-            // spawned next to random existing player
-            int parentIndex = 
-                randSource.getRandomBoundedInt( 0,
-                                                parentChoices.size() - 1 );
-            
-            parent = parentChoices.getElementDirect( parentIndex );
-            }
-        else {
-            // baby
-            
-            // pick random mother from a weighted distribution based on 
-            // each mother's temperature
-            
-            
-            // 0.5 temp is worth .5 weight
-            // 1.0 temp and 0 are worth 0 weight
-            
-            double totalTemp = 0;
-            
-            for( int i=0; i<parentChoices.size(); i++ ) {
-                LiveObject *p = parentChoices.getElementDirect( i );
-
-                totalTemp += 0.5 - abs( p->heat - 0.5 );
-                }
-
-            double choice = 
-                randSource.getRandomBoundedDouble( 0, totalTemp );
-            
-            
-            totalTemp = 0;
-            
-            for( int i=0; i<parentChoices.size(); i++ ) {
-                LiveObject *p = parentChoices.getElementDirect( i );
-
-                totalTemp += 0.5 - abs( p->heat - 0.5 );
-                
-                if( totalTemp >= choice ) {
-                    parent = p;
-                    break;
-                    }                
-                }
-            }
-        
-
-        
-        if( ! newObject.isEve ) {
-            // mother giving birth to baby
-            // take a ton out of her food store
-
-            int min = 4;
-            if( parent->foodStore < min ) {
-                min = parent->foodStore;
-                }
-            parent->foodStore -= babyBirthFoodDecrement;
-            if( parent->foodStore < min ) {
-                parent->foodStore = min;
-                }
-
-            parent->foodDecrementETASeconds +=
-                computeFoodDecrementTimeSeconds( parent );
-            
-            parent->foodUpdate = true;
-            
-
-            // only set race if the spawn-near player is our mother
-            // otherwise, we are a new Eve spawning next to a baby
-            
-            timeSec_t curTime = Time::timeSec();
-            
-            parent->babyBirthTimes->push_back( curTime );
-            parent->babyIDs->push_back( newObject.id );
-            
-            // set cool-down time before this worman can have another baby
-            parent->birthCoolDown = pickBirthCooldownSeconds() + curTime;
-
-            ObjectRecord *parentObject = getObject( parent->displayID );
-
-            // pick race of child
-            int numRaces;
-            int *races = getRaces( &numRaces );
-        
-            int parentRaceIndex = -1;
-            
-            for( int i=0; i<numRaces; i++ ) {
-                if( parentObject->race == races[i] ) {
-                    parentRaceIndex = i;
-                    break;
-                    }
-                }
-            
-
-            if( parentRaceIndex != -1 ) {
-                
-                int childRace = parentObject->race;
-                
-                if( randSource.getRandomDouble() > childSameRaceLikelihood ) {
-                    // different race than parent
-                    
-                    int offset = 1;
-                    
-                    if( randSource.getRandomBoolean() ) {
-                        offset = -1;
-                        }
-                    int childRaceIndex = parentRaceIndex + offset;
-                    
-                    // don't wrap around
-                    // but push in other direction instead
-                    if( childRaceIndex >= numRaces ) {
-                        childRaceIndex = numRaces - 2;
-                        }
-                    if( childRaceIndex < 0 ) {
-                        childRaceIndex = 1;
-                        }
-                    
-                    // stay in bounds
-                    if( childRaceIndex >= numRaces ) {
-                        childRaceIndex = numRaces - 1;
-                        }
-                    
-
-                    childRace = races[ childRaceIndex ];
-                    }
-                
-                if( childRace == parentObject->race ) {
-                    newObject.displayID = getRandomFamilyMember( 
-                        parentObject->race, parent->displayID, familySpan );
-                    }
-                else {
-                    newObject.displayID = 
-                        getRandomPersonObjectOfRace( childRace );
-                    }
-            
-                }
-        
-            delete [] races;
-            }
-        
-        if( parent->xs == parent->xd && 
-            parent->ys == parent->yd ) {
-                        
-            // stationary parent
-            newObject.xs = parent->xs;
-            newObject.ys = parent->ys;
-                        
-            newObject.xd = parent->xs;
-            newObject.yd = parent->ys;
-            }
-        else {
-            // find where parent is along path
-            GridPos cPos = computePartialMoveSpot( parent );
-                        
-            newObject.xs = cPos.x;
-            newObject.ys = cPos.y;
-                        
-            newObject.xd = cPos.x;
-            newObject.yd = cPos.y;
-            }
-        
-        if( newObject.xs > maxPlacementX ) {
-            maxPlacementX = newObject.xs;
-            }
-        }
-    else if( inTutorialNumber > 0 ) {
-        
-        int startX = maxPlacementX * 2;
-        int startY = tutorialCount * 25;
-
-        newObject.xs = startX;
-        newObject.ys = startY;
-        
-        newObject.xd = startX;
-        newObject.yd = startY;
-
-        char *mapFileName = autoSprintf( "tutorial%d.txt", inTutorialNumber );
-        
-        placed = loadTutorial( mapFileName, startX, startY );
-        
-        delete [] mapFileName;
-
-        tutorialCount ++;
-
-        int maxPlayers = 
-            SettingsManager::getIntSetting( "maxPlayers", 200 );
-
-        if( tutorialCount > maxPlayers * 2 ) {
-            // wrap back to 0 so we don't keep getting farther
-            // and farther away on map if server runs for a long time.
-
-            // The earlier-placed tutorials are over by now, because
-            // we can't have more than maxPlayers tutorials running at once
-            
-            tutorialCount = 0;
-            }
-        }
-    
-    
-    if( !placed ) {
-        // tutorial didn't happen if not placed
-        newObject.isTutorial = false;
-        
-        // else starts at civ outskirts (lone Eve)
-        int startX = 0;
-        int startY = 0;
-
-
-        if( SettingsManager::getIntSetting( "forceEveLocation", 0 ) ) {
-            if( newObject.nation == -1 ) {
-                startX = 
-                    SettingsManager::getIntSetting( "forceEveLocationX", 0 );
-                startY = 
-                    SettingsManager::getIntSetting( "forceEveLocationY", 0 );
-                } else {
-                    getNationPosition( newObject.nation, &startX, &startY );
-                }
-            }
-            else {
-                getEvePosition( newObject.email, &startX, &startY );
-            }        
-        
-        newObject.xs = startX;
-        newObject.ys = startY;
-        
-        newObject.xd = startX;
-        newObject.yd = startY;
-
-        if( newObject.xs > maxPlacementX ) {
-            maxPlacementX = newObject.xs;
-            }
-        }
-    
-
-    int forceID = SettingsManager::getIntSetting( "forceEveObject", 0 );
-    
-    if( forceID > 0 ) {
-        newObject.displayID = forceID;
-        }
-    
-    
-    float forceAge = SettingsManager::getFloatSetting( "forceEveAge", 0.0 );
-    
-    if( forceAge > 0 ) {
-        newObject.lifeStartTimeSeconds = 
-            Time::getCurrentTime() - forceAge * ( 1.0 / getAgeRate() );
-        }
-    
-
+    // AppLog::infoF("Setting new object values\n");
     newObject.holdingID = 0;
-
-
-    if( areTriggersEnabled() ) {
-        int id = getTriggerPlayerDisplayID( inEmail );
-        
-        if( id != -1 ) {
-            newObject.displayID = id;
-            
-            newObject.lifeStartTimeSeconds = 
-                Time::getCurrentTime() - 
-                getTriggerPlayerAge( inEmail ) * ( 1.0 / getAgeRate() );
-        
-            GridPos pos = getTriggerPlayerPos( inEmail );
-            
-            newObject.xd = pos.x;
-            newObject.yd = pos.y;
-            newObject.xs = pos.x;
-            newObject.ys = pos.y;
-            newObject.xd = pos.x;
-            
-            newObject.holdingID = getTriggerPlayerHolding( inEmail );
-            newObject.clothing = getTriggerPlayerClothing( inEmail );
-            }
-        }
-    
     
     newObject.lineage = new SimpleVector<int>();
-    
+
     newObject.name = NULL;
     newObject.lastSay = NULL;
     newObject.curseLevel = 0;
@@ -3840,8 +3492,9 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.holdingWound = false;
     
     newObject.murderPerpID = 0;
+    newObject.deathSourceID = 0;
     newObject.murderPerpEmail = NULL;
-    
+
     newObject.deathSourceID = 0;
     
     newObject.everKilledOther = false;
@@ -3879,46 +3532,583 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.monumentPosSet = false;
     newObject.monumentPosSent = true;
     
+
                 
     for( int i=0; i<HEAT_MAP_D * HEAT_MAP_D; i++ ) {
         newObject.heatMap[i] = 0;
         }
 
     
-    newObject.parentID = -1;
-    char *parentEmail = NULL;
+    newObject.motherID = -1;
+    char *motherEmail = NULL;
+    newObject.fatherID = -1;
 
-    if( parent != NULL && isFertileAge( parent ) ) {
-        // do not log babies that new Eve spawns next to as parents
-        newObject.parentID = parent->id;
-        parentEmail = parent->email;
+    int numPlayers = players.size();
+                            
+    SimpleVector<LiveObject*> motherChoices;
+    SimpleVector<LiveObject*> adultMales;
+    SimpleVector<LiveObject*> unmatchedAdams;
+    
 
-        newObject.lineageEveID = parent->lineageEveID;
+    // lower the bad mother limit in low-population situations
+    // so that babies aren't stuck with the same low-skill mother over and
+    // over
+    int badMotherLimit = 2 + numPlayers / 3;
 
-        newObject.parentChainLength = parent->parentChainLength + 1;
+    if( badMotherLimit > 10 ) {
+        badMotherLimit = 10;
+        }
+    
+    // with new birth cooldowns, we don't need bad mother limit anymore
+    // try making it a non-factor
+    badMotherLimit = 9999999;
+    
+    
+    primeLineageTest( numPlayers );
 
-        // mother
-        newObject.lineage->push_back( newObject.parentID );
+    LiveObject *spawnTarget = NULL;
+    char placed = false;
+    
 
-        // inherit last heard monument, if any, from parent
-        newObject.monumentPosSet = parent->monumentPosSet;
-        newObject.lastMonumentPos = parent->lastMonumentPos;
-        newObject.lastMonumentID = parent->lastMonumentID;
-        if( newObject.monumentPosSet ) {
-            newObject.monumentPosSent = false;
+    printf("Checking existing players for spawn conditions\n");
+    for( int i=0; i<numPlayers; i++ ) {
+        LiveObject *player = players.getElement( i );
+        
+        if( player->error ) {
+            printf("Player %d is dead\n", player->id );
+            continue;
             }
-        
-        
-        for( int i=0; 
-             i < parent->lineage->size() && 
-                 i < maxLineageTracked - 1;
-             i++ ) {
+        if( player->nation != newObject.nation ) {
+            printf("Player %d is in a different nation\n", player->id );
+            continue;
+        }
+
+        if( player->isAdam && !player->hasEve ) {
+            printf("Player %d is an Adam with no Eve\n", player->id);
+            unmatchedAdams.push_back( player );
+        }
+
+        if( player->isTutorial ) {
+            printf("Player %d is completing the tutorial\n", player->id );
+            continue;
+            }
+
+        if( isFatherAge( player ) ) {
+            printf("Player %d is a male of age %f\n", player->id, computeAge( player ));
+            if( ! isLinePermitted( newObject.email, player->lineageEveID ) ) {
+                printf("But player %d is lineage locked\n", player->id );
+                // this line forbidden for new player
+                continue;
+                }
+            adultMales.push_back( player );
+        } else if( isFertileAge( player ) ) {
+            printf("Player %d is a female of age %f\n", player->id, computeAge( player ));
             
-            newObject.lineage->push_back( 
-                parent->lineage->getElementDirect( i ) );
+            // make sure this woman isn't on cooldown
+            // and that she's not a bad mother
+            char canHaveBaby = true;
+
+            
+            if( Time::timeSec() < player->birthCoolDown ) {
+                printf("but player %d is on birth cooldown\n", player->id);
+                canHaveBaby = false;
+                }
+            
+            if( ! isLinePermitted( newObject.email, player->lineageEveID ) ) {
+                // this line forbidden for new player
+                printf("But player %d is lineage locked\n", player->id );
+                continue;
+                }
+            
+
+            int numPastBabies = player->babyIDs->size();
+            
+            if( canHaveBaby && numPastBabies >= badMotherLimit ) {
+                int numDead = 0;
+                
+                for( int b=0; b < numPastBabies; b++ ) {
+                    
+                    int bID = 
+                        player->babyIDs->getElementDirect( b );
+
+                    char bAlive = false;
+                    
+                    for( int j=0; j<numPlayers; j++ ) {
+                        LiveObject *otherObj = players.getElement( j );
+                    
+                        if( otherObj->error ) {
+                            continue;
+                            }
+
+                        int id = otherObj->id;
+                    
+                        if( id == bID ) {
+                            bAlive = true;
+                            break;
+                            }
+                        }
+                    if( ! bAlive ) {
+                        numDead ++;
+                        }
+                    }
+                
+                if( numDead >= badMotherLimit ) {
+                    // this is a bad mother who lets all babies die
+                    // don't give them more babies
+                    printf("But player %d is a bad mother\n", player->id);
+                    canHaveBaby = false;
+                    }
+                }
+            
+            if( canHaveBaby ) {
+                printf("Player %d is a an eligible mother\n", player->id);
+                motherChoices.push_back( player );
+                }
             }
         }
 
+
+    if( inTutorialNumber > 0 ) {
+        // Tutorial always played full-grown
+        printf("New player is completing the tutorial; discarding mother choices\n");
+        motherChoices.deleteAll();
+        }
+
+
+    if( unmatchedAdams.size() > 0 && inTutorialNumber == 0 ) {
+        printf("There are %d unmatched Adams, spawning as an Eve\n", unmatchedAdams.size());
+        // new Eve
+        // she starts almost full grown
+
+        newObject.isEve = true;
+        newObject.lineageEveID = newObject.id;
+        
+        newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
+
+        int femaleID = getRandomFemalePersonObject();
+        
+        if( femaleID != -1 ) {
+            newObject.displayID = femaleID;
+        }
+
+        // spawned next to random unmatched Adam
+        int spawnTargetIndex = 
+            randSource.getRandomBoundedInt( 0,
+                                            unmatchedAdams.size() - 1 );
+        
+        spawnTarget = unmatchedAdams.getElementDirect( spawnTargetIndex );
+        printf("Spawning Eve next to %d\n", spawnTarget->id);
+
+        const char *lastName = "";
+        if( spawnTarget->name != NULL ) {
+            lastName = strstr( spawnTarget->name, 
+                                " " );
+            
+            if( lastName != NULL ) {
+                newObject.name = autoSprintf( "%s %s",
+                                            eveName, 
+                                            lastName );
+                }
+            newObject.name = getUniqueCursableName( newObject.name );
+            printf("Eve's name is %s\n", newObject.name );
+            }
+
+        printf("Spawning Eve next to Adam\n");
+        if( spawnTarget->xs == spawnTarget->xd && 
+            spawnTarget->ys == spawnTarget->yd ) {
+            printf("Adam is not moving, spawning at his location\n");
+            // stationary Adam
+            newObject.xs = spawnTarget->xs;
+            newObject.ys = spawnTarget->ys;
+                        
+            newObject.xd = spawnTarget->xs;
+            newObject.yd = spawnTarget->ys;
+            }
+        else {
+            printf("Adam is moving, calculating his location\n");
+            // find where Adam is along path
+            GridPos cPos = computePartialMoveSpot( spawnTarget );
+                        
+            newObject.xs = cPos.x;
+            newObject.ys = cPos.y;
+                        
+            newObject.xd = cPos.x;
+            newObject.yd = cPos.y;
+
+            }
+        printf("Remembering that this Adam has an Eve\n");
+        spawnTarget->hasEve = true;
+        if( newObject.xs > maxPlacementX ) {
+            printf("Updating maxPlacementX\n" );
+            maxPlacementX = newObject.xs;
+            }
+
+
+    } else if( unmatchedAdams.size() == 0 && motherChoices.size() > 0 ) {
+        printf("Choosing a mother\n");
+        // baby
+        
+        // pick random mother from a weighted distribution based on 
+        // each mother's temperature
+    
+
+
+        // and proximity to an adult male
+        
+        
+        // 0.5 temp is worth .5 weight
+        // 1.0 temp and 0 are worth 0 weight
+        
+        double totalTemp = 0;
+        
+        for( int i=0; i<motherChoices.size(); i++ ) {
+            LiveObject *p = motherChoices.getElementDirect( i );
+
+            p->distanceToClosestAdultMale = SettingsManager::getIntSetting( "fatherMaxDistance", 50 );
+            for( int j=0; j<adultMales.size(); j++ ) {
+                LiveObject *f = adultMales.getElementDirect( j );
+
+                double xdiff = (f->xs - p->xs);
+                double ydiff = (f->ys - p->ys);
+                double distance = sqrt( xdiff * xdiff + ydiff * ydiff );
+
+                printf("Distance to %d is %f\n", f->id, distance);
+
+                if( distance < SettingsManager::getIntSetting( "fatherMinDistance", 10 ) ) {
+                    // within about a screen's distance, the chance is the same
+                    distance = SettingsManager::getIntSetting( "fatherMinDistance", 10 );
+                }
+
+                if( distance < p->distanceToClosestAdultMale || 
+                ( distance == p->distanceToClosestAdultMale && 
+                randSource.getRandomBoundedDouble(0, 1 ) > 0.5 ) ) {
+                    // this guy is closer or this guy is the same distance
+                    // and wins a coin toss
+                    p->distanceToClosestAdultMale = distance;
+                    p->closestAdultMaleID = f->id;
+                    printf("Closest male is now %d at distance %f\n", f->id, distance);
+                }
+
+            }
+
+            double thisTemp = (0.5 - abs( p->heat - 0.5 )) * (SettingsManager::getIntSetting( "fatherMaxDistance", 50 ) + 1
+                - p->distanceToClosestAdultMale);
+            if( p->distanceToClosestAdultMale == SettingsManager::getIntSetting( "fatherMaxDistance", 50 ) ) {
+                thisTemp = 0;
+            }
+            totalTemp += thisTemp;
+            }
+
+        double choice = 
+            randSource.getRandomBoundedDouble( 0, totalTemp );
+        
+        // if there are no eligible fathers, don't choose a mother, which will mean spawning as an Adam
+        if( totalTemp > 0 ) {
+            totalTemp = 0;
+            
+            for( int i=0; i<motherChoices.size(); i++ ) {
+                LiveObject *p = motherChoices.getElementDirect( i );
+
+                double thisTemp = (0.5 - abs( p->heat - 0.5 )) * (SettingsManager::getIntSetting( "fatherMaxDistance", 50 ) + 1
+                    - p->distanceToClosestAdultMale);
+                if( p->distanceToClosestAdultMale == SettingsManager::getIntSetting( "fatherMaxDistance", 50 ) ) {
+                    thisTemp = 0;
+                }
+                totalTemp += thisTemp;
+                
+                if( totalTemp >= choice ) {
+                    spawnTarget = p;
+                    printf("Choosing %d as mother\n", p->id);
+                    break;
+                    }
+                }
+            }
+        }
+        else if( inTutorialNumber > 0 ) {
+        printf("Setting up tutorial state\n" );
+        
+        int startX = maxPlacementX * 2;
+        int startY = tutorialCount * 25;
+
+        newObject.xs = startX;
+        newObject.ys = startY;
+        
+        newObject.xd = startX;
+        newObject.yd = startY;
+
+        char *mapFileName = autoSprintf( "tutorial%d.txt", inTutorialNumber );
+        
+        placed = loadTutorial( mapFileName, startX, startY );
+        
+        delete [] mapFileName;
+
+        tutorialCount ++;
+
+        int maxPlayers = 
+            SettingsManager::getIntSetting( "maxPlayers", 200 );
+
+        if( tutorialCount > maxPlayers * 2 ) {
+            // wrap back to 0 so we don't keep getting farther
+            // and farther away on map if server runs for a long time.
+
+            // The earlier-placed tutorials are over by now, because
+            // we can't have more than maxPlayers tutorials running at once
+            
+            tutorialCount = 0;
+            }
+        }
+
+
+    if( spawnTarget == NULL ) {
+        printf("No eligible mothers or no eligible fathers and no unmatched Adams, spawning as an Adam\n");
+        // new Adam
+        // he starts almost full grown
+
+        newObject.isAdam = true;
+        
+        newObject.lifeStartTimeSeconds -= 14 * ( 1.0 / getAgeRate() );
+
+        
+        int maleID = getRandomMalePersonObject();
+        
+        if( maleID != -1 ) {
+            newObject.displayID = maleID;
+            }
+        
+        printf("Spawning Adam at a new Adam location\n");
+        // else starts at civ outskirts (lone Adam)
+        if( !newObject.isTutorial ) {
+            int startX, startY;
+            if( newObject.nation == -1 ) {
+                getEvePosition( newObject.email, &startX, &startY );
+
+                if( SettingsManager::getIntSetting( "forceEveLocation", 0 ) ) {
+
+                    startX = 
+                        SettingsManager::getIntSetting( "forceEveLocationX", 0 );
+                    startY = 
+                        SettingsManager::getIntSetting( "forceEveLocationY", 0 );
+                    }
+                }
+            else {
+                getNationPosition( newObject.nation, &startX, &startY );
+            }
+            
+            newObject.xs = startX;
+            newObject.ys = startY;
+            
+            newObject.xd = startX;
+            newObject.yd = startY;
+            }
+
+        int forceID = SettingsManager::getIntSetting( "forceEveObject", 0 );
+        
+        if( forceID > 0 ) {
+            printf("Forcing Adam displayID\n");
+            newObject.displayID = forceID;
+            }
+        
+        
+        float forceAge = SettingsManager::getFloatSetting( "forceEveAge", 0.0 );
+        
+        if( forceAge > 0 ) {
+            printf("Forcing Adam age\n");
+            newObject.lifeStartTimeSeconds = 
+                Time::getCurrentTime() - forceAge * ( 1.0 / getAgeRate() );
+            }
+        }
+
+    // else player starts as newborn
+    // start full up to capacity with food
+    newObject.foodStore = computeFoodCapacity( &newObject );
+    newObject.foodDecrementETASeconds =
+        Time::getCurrentTime() + 
+        computeFoodDecrementTimeSeconds( &newObject );
+
+    if( newObject.isTutorial && newObject.foodStore > 10 ) {
+        // so they can practice eating at the beginning of the tutorial
+        newObject.foodStore -= 6;
+        }
+
+
+    if( ! newObject.isEve && ! newObject.isAdam && !newObject.isTutorial ) {
+        printf("Spawning as a baby\n");
+        // babies start out almost starving
+        newObject.foodStore = 2;
+        printf("New player is a baby, choosing race and updating mother's food store\n");
+        // mother giving birth to baby
+        // take a ton out of her food store
+
+        int min = 4;
+        if( spawnTarget->foodStore < min ) {
+            min = spawnTarget->foodStore;
+            }
+        spawnTarget->foodStore -= babyBirthFoodDecrement;
+        if( spawnTarget->foodStore < min ) {
+            spawnTarget->foodStore = min;
+            }
+
+        spawnTarget->foodDecrementETASeconds +=
+            computeFoodDecrementTimeSeconds( spawnTarget );
+        
+        spawnTarget->foodUpdate = true;
+        
+
+        // only set race if the spawn-near player is our mother
+        // otherwise, we are a new Eve spawning next to a baby
+        
+        timeSec_t curTime = Time::timeSec();
+        
+        spawnTarget->babyBirthTimes->push_back( curTime );
+        spawnTarget->babyIDs->push_back( newObject.id );
+        
+        // set cool-down time before this worman can have another baby
+        spawnTarget->birthCoolDown = pickBirthCooldownSeconds() + curTime;
+
+        ObjectRecord *motherObject = getObject( spawnTarget->displayID );
+
+        // pick race of child
+        int numRaces;
+        int *races = getRaces( &numRaces );
+    
+        int motherRaceIndex = -1;
+        
+        for( int i=0; i<numRaces; i++ ) {
+            if( motherObject->race == races[i] ) {
+                motherRaceIndex = i;
+                break;
+                }
+            }
+        
+
+        if( motherRaceIndex != -1 ) {
+            
+            int childRace = motherObject->race;
+            
+            if( randSource.getRandomDouble() > childSameRaceLikelihood ) {
+                // different race than mother
+                
+                int offset = 1;
+                
+                if( randSource.getRandomBoolean() ) {
+                    offset = -1;
+                    }
+                int childRaceIndex = motherRaceIndex + offset;
+                
+                // don't wrap around
+                // but push in other direction instead
+                if( childRaceIndex >= numRaces ) {
+                    childRaceIndex = numRaces - 2;
+                    }
+                if( childRaceIndex < 0 ) {
+                    childRaceIndex = 1;
+                    }
+                
+                // stay in bounds
+                if( childRaceIndex >= numRaces ) {
+                    childRaceIndex = numRaces - 1;
+                    }
+                
+
+                childRace = races[ childRaceIndex ];
+                }
+            
+            if( childRace == motherObject->race ) {
+                newObject.displayID = getRandomFamilyMember( 
+                    motherObject->race, spawnTarget->displayID, familySpan );
+                }
+            else {
+                newObject.displayID = 
+                    getRandomPersonObjectOfRace( childRace );
+                }
+        
+            }
+    
+        delete [] races;
+        
+        if( spawnTarget->xs == spawnTarget->xd && 
+            spawnTarget->ys == spawnTarget->yd ) {
+            printf("Mother is not moving, spawning baby at her location\n");
+
+            // stationary mother
+            newObject.xs = spawnTarget->xs;
+            newObject.ys = spawnTarget->ys;
+                        
+            newObject.xd = spawnTarget->xs;
+            newObject.yd = spawnTarget->ys;
+            }
+        else {
+            // find where mother is along path
+            printf("Mother is moving, calculating location\n");
+            GridPos cPos = computePartialMoveSpot( spawnTarget );
+                        
+            newObject.xs = cPos.x;
+            newObject.ys = cPos.y;
+                        
+            newObject.xd = cPos.x;
+            newObject.yd = cPos.y;
+            }
+        if( newObject.xs > maxPlacementX ) {
+            maxPlacementX = newObject.xs;
+            }
+
+        printf("Setting new object's father and mother IDs\n");
+        // do not log babies that new Eve spawns next to as mothers
+        // or Eves that Adam spawns next to
+        newObject.motherID = spawnTarget->id;
+        newObject.fatherID = spawnTarget->closestAdultMaleID;
+        motherEmail = spawnTarget->email;
+
+        newObject.lineageEveID = spawnTarget->lineageEveID;
+
+
+        // inherit last heard monument, if any, from parent
+        newObject.monumentPosSet = spawnTarget->monumentPosSet;
+        newObject.lastMonumentPos = spawnTarget->lastMonumentPos;
+        newObject.lastMonumentID = spawnTarget->lastMonumentID;
+        if( newObject.monumentPosSet ) {
+            newObject.monumentPosSent = false;
+            }
+        }
+
+        // for( int i=0; 
+        //      i < spawnTarget->lineage->size() && 
+        //          i < maxLineageTracked - 1;
+        //      i++ ) {
+            
+        //     newObject.lineage->push_back( 
+        //         spawnTarget->lineage->getElementDirect( i ) );
+        //     }
+        // }
+
+
+    if( areTriggersEnabled() ) {
+        // AppLog::infoF("Triggers are enabled\n");
+        int id = getTriggerPlayerDisplayID( inEmail );
+        
+        if( id != -1 ) {
+            // AppLog::infoF("ID is not -1\n");
+            newObject.displayID = id;
+            
+            newObject.lifeStartTimeSeconds = 
+                Time::getCurrentTime() - 
+                getTriggerPlayerAge( inEmail ) * ( 1.0 / getAgeRate() );
+        
+            GridPos pos = getTriggerPlayerPos( inEmail );
+            
+            newObject.xd = pos.x;
+            newObject.yd = pos.y;
+            newObject.xs = pos.x;
+            newObject.ys = pos.y;
+            newObject.xd = pos.x;
+            
+            newObject.holdingID = getTriggerPlayerHolding( inEmail );
+            newObject.clothing = getTriggerPlayerClothing( inEmail );
+            }
+        }
+    
+
+    
     newObject.birthPos.x = newObject.xd;
     newObject.birthPos.y = newObject.yd;
     
@@ -3929,22 +4119,23 @@ void processLoggedInPlayer( Socket *inSock,
     
 
     
-    // parent pointer possibly no longer valid after push_back, which
+    // mother pointer possibly no longer valid after push_back, which
     // can resize the vector
-    parent = NULL;
+    spawnTarget = NULL;
     players.push_back( newObject );            
 
 
+    printf("Logging the birth\n");
     if( ! newObject.isTutorial )        
     logBirth( newObject.id,
               newObject.email,
-              newObject.parentID,
-              parentEmail,
+              newObject.motherID,
+              motherEmail,
               ! getFemale( &newObject ),
               newObject.xd,
               newObject.yd,
               players.size(),
-              newObject.parentChainLength );
+              newObject.motherChainLength );
     
     AppLog::infoF( "New player %s connected as player %d (tutorial=%d)",
                    newObject.email, newObject.id,
@@ -4950,82 +5141,6 @@ void monumentStep() {
 
 
 
-// inPlayerName may be destroyed inside this function
-// returns a uniquified name, sometimes newly allocated.
-// return value destroyed by caller
-char *getUniqueCursableName( char *inPlayerName ) {
-    
-    char dup = isNameDuplicateForCurses( inPlayerName );
-    
-    if( ! dup ) {
-        return inPlayerName;
-        }
-    else {
-        
-        int targetPersonNumber = 1;
-        
-        char *fullName = stringDuplicate( inPlayerName );
-
-        while( dup ) {
-            // try next roman numeral
-            targetPersonNumber++;
-            
-            int personNumber = targetPersonNumber;            
-        
-            SimpleVector<char> romanNumeralList;
-        
-            while( personNumber >= 100 ) {
-                romanNumeralList.push_back( 'C' );
-                personNumber -= 100;
-                }
-            while( personNumber >= 50 ) {
-                romanNumeralList.push_back( 'L' );
-                personNumber -= 50;
-                }
-            while( personNumber >= 40 ) {
-                romanNumeralList.push_back( 'X' );
-                romanNumeralList.push_back( 'L' );
-                personNumber -= 40;
-                }
-            while( personNumber >= 10 ) {
-                romanNumeralList.push_back( 'X' );
-                personNumber -= 10;
-                }
-            while( personNumber >= 9 ) {
-                romanNumeralList.push_back( 'I' );
-                romanNumeralList.push_back( 'X' );
-                personNumber -= 9;
-                }
-            while( personNumber >= 5 ) {
-                romanNumeralList.push_back( 'V' );
-                personNumber -= 5;
-                }
-            while( personNumber >= 4 ) {
-                romanNumeralList.push_back( 'I' );
-                romanNumeralList.push_back( 'V' );
-                personNumber -= 4;
-                }
-            while( personNumber >= 1 ) {
-                romanNumeralList.push_back( 'I' );
-                personNumber -= 1;
-                }
-            
-            char *romanString = romanNumeralList.getElementString();
-
-            delete [] fullName;
-            
-            fullName = autoSprintf( "%s %s", inPlayerName, romanString );
-            delete [] romanString;
-            
-            dup = isNameDuplicateForCurses( fullName );
-            }
-        
-        delete [] inPlayerName;
-        
-        return fullName;
-        }
-    
-    }
 
 
 
@@ -5147,6 +5262,8 @@ int main() {
     
     eveName = 
         SettingsManager::getStringSetting( "eveName", "EVE" );
+    adamName = 
+        SettingsManager::getStringSetting( "adamName", "ADAM" );
 
 
 #ifdef WIN_32
@@ -6399,7 +6516,7 @@ int main() {
                     
 
                     if( m.type == MOVE && nextPlayer->heldByOther ) {
-                        // baby wiggling out of parent's arms
+                        // baby wiggling out of mother's arms
                         handleForcedBabyDrop( 
                             nextPlayer,
                             &playerIndicesToSendUpdatesAbout );
@@ -6899,14 +7016,20 @@ int main() {
                         
 
                         
-                        if( nextPlayer->isEve && nextPlayer->name == NULL ) {
+                        if( ( nextPlayer->isEve || nextPlayer->isAdam ) && nextPlayer->name == NULL ) {
                             char *name = isFamilyNamingSay( m.saidText );
                             
                             if( name != NULL && strcmp( name, "" ) != 0 ) {
                                 const char *close = findCloseLastName( name );
-                                nextPlayer->name = autoSprintf( "%s %s",
-                                                                eveName, 
-                                                                close );
+                                if( nextPlayer->isEve ) {
+                                    nextPlayer->name = autoSprintf( "%s %s",
+                                                                    eveName, 
+                                                                    close );
+                                } else if( nextPlayer->isAdam ) {
+                                    nextPlayer->name = autoSprintf( "%s %s",
+                                                                    adamName, 
+                                                                    close );
+                                }
                                 nextPlayer->name = getUniqueCursableName( 
                                     nextPlayer->name );
 
@@ -8341,7 +8464,7 @@ int main() {
                                                 hitPlayer );
 
                                         // fixed cost to pick up baby
-                                        // this still encourages baby-parent
+                                        // this still encourages baby-mother
                                         // communication so as not
                                         // to get the most mileage out of 
                                         // food
@@ -9347,7 +9470,7 @@ int main() {
                 recordPlayerLineage( nextPlayer->email, 
                                      age,
                                      nextPlayer->id,
-                                     nextPlayer->parentID,
+                                     nextPlayer->motherID,
                                      nextPlayer->displayID,
                                      killerID,
                                      nextPlayer->name,
@@ -10835,18 +10958,16 @@ int main() {
                     }
 
                 char *pID = autoSprintf( "%d", nextPlayer->id );
+                char *fatherID = autoSprintf( "%d", nextPlayer->fatherID );
+                char *motherID = autoSprintf( "%d", nextPlayer->motherID );
+                AppLog::infoF("Sending lineage message: %d %d %d\n", nextPlayer->id, nextPlayer->fatherID, nextPlayer->motherID);
                 linWorking.appendElementString( pID );
+                linWorking.appendElementString( fatherID );
+                linWorking.appendElementString( motherID );
                 delete [] pID;
+                delete [] fatherID;
+                delete [] motherID;
                 numAdded++;
-                for( int j=0; j<nextPlayer->lineage->size(); j++ ) {
-                    char *mID = 
-                        autoSprintf( 
-                            " %d",
-                            nextPlayer->lineage->getElementDirect( j ) );
-                    linWorking.appendElementString( mID );
-                    delete [] mID;
-                    }        
-                linWorking.push_back( '\n' );
                 }
             
             linWorking.push_back( '#' );
@@ -11211,18 +11332,17 @@ int main() {
                         continue;
                         }
 
-                    char *pID = autoSprintf( "%d", o->id );
+                    char *pID = autoSprintf( "%d", nextPlayer->id );
+                    char *fatherID = autoSprintf( "%d", nextPlayer->fatherID );
+                    char *motherID = autoSprintf( "%d", nextPlayer->motherID );
+                    AppLog::infoF("Sending first lineage message: %d %d %d\n", nextPlayer->id, nextPlayer->fatherID, nextPlayer->motherID);
                     linWorking.appendElementString( pID );
+                    linWorking.appendElementString( fatherID );
+                    linWorking.appendElementString( motherID );
                     delete [] pID;
+                    delete [] fatherID;
+                    delete [] motherID;
                     numAdded++;
-                    for( int j=0; j<o->lineage->size(); j++ ) {
-                        char *mID = 
-                            autoSprintf( 
-                                " %d",
-                                o->lineage->getElementDirect( j ) );
-                        linWorking.appendElementString( mID );
-                        delete [] mID;
-                        }        
                     linWorking.push_back( '\n' );
                     }
                 
@@ -11490,7 +11610,7 @@ int main() {
 
                                 if( adultO->id != nextPlayer->id &&
                                     otherPlayer->id != nextPlayer->id ) {
-                                    // parent not us
+                                    // mother not us
                                     // baby not us
 
                                     double d = intDist( playerXD,

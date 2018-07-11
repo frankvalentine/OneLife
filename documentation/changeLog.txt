@@ -3,14 +3,29 @@ This file only list changes to game code.  Changes to content can be found here:
 http://onehouronelife.com/updateLog.php
 
 
+Version 124    ???
 
-Version 123    ???
+--Added client source code version match check in platform build scripts
+  (to prevent problem that happened during release of v123).
+
+
+
+
+Version 123    2018-July-10
 
 --Fixed memory leak and uninitialized variable.
 
 --Fixed bad memory access in audio callback when shutting down.
 
 --Fixed memory leak in update process.
+
+
+
+
+Windows base update:   Version 65c    2018-July-10
+
+--Fixed slow newline replacement code (as part of update process) that was 
+  getting bogged down when processing text files with many lines.
 
 
 
@@ -23,6 +38,9 @@ Server Fixes
 
 --If a name isn't unique as far as the curse system is concerned, a roman
   numeral suffix (II, III, IV, V, etc.) is automatically added.
+
+--Data-only diff bundle generation script now skips scenes.  They never should
+  have been included, and the tutorial map scene was BIG (26,000 lines).
 
 
 
