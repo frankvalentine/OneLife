@@ -3,10 +3,165 @@ This file only list changes to game code.  Changes to content can be found here:
 http://onehouronelife.com/updateLog.php
 
 
+Version 124    ???
 
-Version 117    ???
+--Added client source code version match check in platform build scripts
+  (to prevent problem that happened during release of v123).
+
+
+
+
+Version 123    2018-July-10
+
+--Fixed memory leak and uninitialized variable.
+
+--Fixed bad memory access in audio callback when shutting down.
+
+--Fixed memory leak in update process.
+
+
+
+
+Windows base update:   Version 65c    2018-July-10
+
+--Fixed slow newline replacement code (as part of update process) that was 
+  getting bogged down when processing text files with many lines.
+
+
+
+
+Server Fixes
+
+--Anyone can name a held baby, even adoptive parents.  They get the last name
+  of their adoptive parent.  An unnamed person who is older than baby age can
+  be named by anyone nearby, but they will never have a last name.
+
+--If a name isn't unique as far as the curse system is concerned, a roman
+  numeral suffix (II, III, IV, V, etc.) is automatically added.
+
+--Data-only diff bundle generation script now skips scenes.  They never should
+  have been included, and the tutorial map scene was BIG (26,000 lines).
+
+
+
+
+Version 122    2018-July-6
+
+--Back to updating hard-coded version number with every client update.  Not
+  sure what I was thinking there.  Saw a version mismatched and found the
+  wrong reason for it.
+
+
+
+
+Version 121    2018-July-6
+
+--Fixed newly introduced bug in sound volumes for positioned sound source when
+  far enough away that volume equation becomes negative (was causing all kinds
+  of sound glitches).
+
+--Responds to new SD (FORCED_SHUTDOWN) message from server.
+
+--Fixed bug that prevented body clothing from being removed.
+  Thanks Midget Maker.
+
+
+
+Server Fixes
+
+--Added new forcedShutdown trigger for server, to cleanly shut down server,
+  and send notice to connected clients, without waiting for everyone to live
+  out their lives.  Need this for emergencies sometimes, and sending SIGSTP to
+  the server, unlike ctrl-z, wasn't working.
+
+
+
+
+Version 119    2018-July-6
+
+--Fixed glitch when picked up and put down by an adult who still has messages
+  pending (thanks Jacek T).  Also handled case where two adults are passing
+  baby back and forth.  It's still a little jumpy if the baby's client has
+  delay, but at least the end result is correct now.
+
+--Fixed bug where player can still try to click on baby's old ground location
+  while the baby is held by someone else.
+
+--NONE RELEVANT if the filter matches, but no transitions are relevant, but
+  NO MATCH if the filter simply doesn't match anything.
+
+--Fixed so that you can't click on arm by accident when trying to click on
+  tunic, bottom, or backpack clothing.  Arm should be unclickable if you are
+  wearing clothes.
+
+--Curse system.  Everyone starts with one curse token and zero curse points. 
+  CURSE JANE SMITH curses Jane Smith, giving her one curse point, and consuming
+  the sayer's curse token.  Sayer gets new curse token after two hours of play.
+  One curse point removed after each hour of play.  A baby with ten or more
+  curse points is born marked.  A marked person cannot be cursed further until
+  they are born unmarked later.  Curse token displayed near temp meter.
+
+--Fixed several bugs in UI paper slip animations and clearing when not
+  operating at full frame rate.
+
+--Home arrow shows tile distance if target is more than 1000 tiles away.
+  Useful for judging whether distant monuments are worth the trip.
+
+
+
+
+Server Fixes
+
+--Fixed typo in computation of stagger time for player who is wounded multiple
+  times.  Fixes #41.  Thanks UncleGus.
+
+--Added YOU'RE and YOURE and I'M and IM as naming phrases, after seeing that in
+  the Life of Bumpy video.
+
+--Fixed so that grave doesn't disappear if you are standing on a cross of
+  permanent objects when you die.  Server now searches in a spiral of 100
+  tiles around your current location to find an empty spot for your grave.
+
+--Max players back down to 140 from 200, so load balancing kicks in at 70
+  players instead of at 100 players.
+
+--Fixed some crashes when baby marked as held by player that is gone.
+
+--Fixed order of naming phrases so that prefixes of other phrases come last.
+
+
+
+
+Version 118    2018-June-29
 
 --Support for masked speech output in client (useful for making gifs).
+
+--Support for tutorial trigger on client login, and server loading a tutorial
+  map out in the unused wilderness and placing player at start of the tutorial.
+
+--Scene editor support for copy/paste of 6x6 area.  Fixed memory leak.
+
+--New crafting hint filter system.  Say /hatchet to show only hints relevant to
+  making a hatchet.  Say / by itself to clear the filter.
+
+--Time played in other lines before returning to a line pushed up to 1.5 hours.
+
+--People who kill, regardless of their time in a line (even less than a half
+  hour) are given the full lineage ban, just like murder victims.  Killing
+  counts as fully participating in a line.  This prevents grief-killers from
+  suiciding before 30 minutes and coming right back.
+
+--TEMP LOGIN button hidden along with login button when checking for FPS
+  mismatch (otherwise, someone might press TEMP LOGIN upon not seeing LOGIN at
+  first).
+
+--Typo in objectBank.  Fixes #39.  Good catch UncleGus.
+
+--Fixed so that you can never click on a held baby by clicking its last ground
+  position (could kill a held baby by accident when trying to set a weapon
+  down where they were standing before pick-up).
+
+
 
 
 

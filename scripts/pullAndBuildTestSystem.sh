@@ -2,7 +2,7 @@
 
 if [ ! -e minorGems ]
 then
-	git clone https://github.com/jasonrohrer/minorGems.git	
+	git clone https://github.com/UncleGus/minorGems.git	
 fi
 
 if [ ! -e OneLife ]
@@ -62,6 +62,7 @@ make
 ln -s ../../OneLifeData7/categories .
 ln -s ../../OneLifeData7/objects .
 ln -s ../../OneLifeData7/transitions .
+ln -s ../../OneLifeData7/tutorialMaps .
 ln -s ../../OneLifeData7/dataVersionNumber.txt .
 
 

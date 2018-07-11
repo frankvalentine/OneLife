@@ -2937,7 +2937,7 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
                         inFlipH, -1, 0, false, false, emptyClothing );
             }
         else if( inClothing.frontShoe != NULL && i == frontFootIndex ) {
-            drawObject( inClothing.backShoe, 2,
+            drawObject( inClothing.frontShoe, 2,
                         frontShoePos, frontShoeRot, true,
                         inFlipH, -1, 0, false, false, emptyClothing );
             }
@@ -3663,7 +3663,6 @@ double getClosestObjectPart( ObjectRecord *inObject,
         bodyPos = inObject->spritePos[ bodyIndex ];
         }
 
-    int backArmTopIndex = getBackArmTopIndex( inObject, inAge );
     
     char tunicChecked = false;
     char hatChecked = false;
@@ -3703,8 +3702,10 @@ double getClosestObjectPart( ObjectRecord *inObject,
                     }
                 hatChecked = true;
                 }
-            else if( i < backArmTopIndex && ! tunicChecked ) {
+            else if( !tunicChecked ) {
                 // bottom, tunic, and backpack behind back arm
+                // but ignore the arm when checking for clothing hit
+                // we never want to click on arm instead of the clothing
                 
                 
                 cObj[0] = inClothing->backpack;        
