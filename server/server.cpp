@@ -74,7 +74,7 @@ int minPickupBabyAge = 10;
 
 int babyAge = 5;
 
-double forceDeathAge = 60;
+double forceDeathAge = 120;
 
 
 double minSayGapInSeconds = 1.0;
@@ -134,6 +134,7 @@ static int familySpan = 2;
 // phrases that trigger baby and family naming
 static SimpleVector<char*> nameGivingPhrases;
 static SimpleVector<char*> familyNameGivingPhrases;
+static SimpleVector<char*> nationNames;
 static SimpleVector<char*> cursingPhrases;
 
 static char *eveName = NULL;
@@ -178,6 +179,8 @@ SimpleVector<FreshConnection> newConnections;
 
 typedef struct LiveObject {
         char *email;
+
+        int nation;
         
         int id;
         
@@ -413,7 +416,12 @@ typedef struct LiveObject {
 
 SimpleVector<LiveObject> players;
 
-
+typedef struct SoundLocation {
+        int objectID;
+        int soundIndex;
+        int x;
+        int y;
+    } SoundLocation;
 
 
 typedef struct GraveInfo {
@@ -872,6 +880,9 @@ void quitCleanup() {
 
     nameGivingPhrases.deallocateStringElements();
     familyNameGivingPhrases.deallocateStringElements();
+    nationNames.deallocateStringElements();
+    // nationMembers.deallocateStringElements();
+    
     cursingPhrases.deallocateStringElements();
 
     if( eveName != NULL ) {
@@ -1281,6 +1292,21 @@ GridPos computePartialMoveSpot( LiveObject *inPlayer ) {
 
 
 
+GridPos getPlayerPos( LiveObject *inPlayer ) {
+    if( inPlayer->xs == inPlayer->xd &&
+        inPlayer->ys == inPlayer->yd ) {
+        
+        GridPos cPos = { inPlayer->xs, inPlayer->ys };
+        
+        return cPos;
+        }
+    else {
+        return computePartialMoveSpot( inPlayer );
+        }
+    }
+
+
+
 GridPos killPlayer( const char *inEmail ) {
     for( int i=0; i<players.size(); i++ ) {
         LiveObject *o = players.getElement( i );
@@ -1450,8 +1476,8 @@ int computeFoodCapacity( LiveObject *inPlayer ) {
         return ageInYears + 4;
         }
     else {
-        // food capacity decreases as we near 60
-        int cap = 60 - ageInYears + 4;
+        // food capacity decreases as we near death
+        int cap = forceDeathAge - ageInYears + 4;
         
         if( cap < 4 ) {
             cap = 4;
@@ -3144,9 +3170,46 @@ static LiveObject *getHitPlayer( int inX, int inY,
     return hitPlayer;
     }
 
-    
+
+char *getNationName( char *inEmail, SimpleVector<char*> *inMemberList ) {
+    for( int i=0; i<inMemberList->size(); i++ ) {
+        char *email = stringToUpperCase( inEmail );
+        char *testString = inMemberList->getElementDirect( i );
+
+        if( strstr( testString, email ) == testString ) {
+            // hit
+            int phraseLen = strlen( email );
+            // skip spaces after
+            while( testString[ phraseLen ] == ' ' ) {
+                phraseLen++;
+                }
+            return &( testString[ phraseLen ] );
+            }
+        }
+    return NULL;
+    }
 
 
+int getNation( char *inEmail, SimpleVector<char*> *inMemberList ) {
+    char *nationName = getNationName( inEmail, inMemberList );
+    if( nationName == NULL ) {
+        return -1;
+    }
+
+    for( int i=0; i<nationNames.size(); i++ ) {
+        if( strstr( nationName, nationNames.getElementDirect( i ) ) == nationName ) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void getNationPosition( int inNation, int *outX, int *outY ) {
+    char *fileName = autoSprintf( "nation%dPositionX", inNation );
+    *outX = SettingsManager::getIntSetting( fileName, 0 );
+    fileName = autoSprintf( "nation%dPositionY", inNation );
+    *outY = SettingsManager::getIntSetting( fileName, 0 );
+}
 
 // for placement of tutorials out of the way 
 static int maxPlacementX = 5000000;
@@ -3155,6 +3218,28 @@ static int maxPlacementX = 5000000;
 static int tutorialCount = 0;
 
         
+
+void readNameGivingPhrases( const char *inSettingsName, 
+                            SimpleVector<char*> *inList ) {
+    char *cont = SettingsManager::getSettingContents( inSettingsName, "" );
+    
+    if( strcmp( cont, "" ) == 0 ) {
+        delete [] cont;
+        return;    
+        }
+    
+    int numParts;
+    char **parts = split( cont, "\n", &numParts );
+    delete [] cont;
+    
+    for( int i=0; i<numParts; i++ ) {
+        if( strcmp( parts[i], "" ) != 0 ) {
+            inList->push_back( stringToUpperCase( parts[i] ) );
+            }
+        delete [] parts[i];
+        }
+    delete [] parts;
+    }
 
 
 void processLoggedInPlayer( Socket *inSock,
@@ -3184,6 +3269,15 @@ void processLoggedInPlayer( Socket *inSock,
     LiveObject newObject;
 
     newObject.email = inEmail;
+
+    SimpleVector<char*> nationMembers;
+
+    readNameGivingPhrases( "nationMembers", &nationMembers );
+
+    newObject.nation = getNation( inEmail, &nationMembers );
+    printf("Player is in nation %d %s\n", newObject.nation, getNationName( inEmail, &nationMembers ));
+
+    nationMembers.deallocateStringElements();
     
     newObject.id = nextID;
     nextID++;
@@ -3262,6 +3356,10 @@ void processLoggedInPlayer( Socket *inSock,
             
             if( ! isLinePermitted( newObject.email, player->lineageEveID ) ) {
                 // this line forbidden for new player
+                continue;
+                }
+            if( player->nation != newObject.nation ) {
+                // can only be born in the same nation
                 continue;
                 }
             
@@ -3347,7 +3445,7 @@ void processLoggedInPlayer( Socket *inSock,
                 continue;
                 }
 
-            if( computeAge( player ) < babyAge ) {
+            if( computeAge( player ) < babyAge && player->nation == newObject.nation ) {
                 parentChoices.push_back( player );
                 }
             }
@@ -3391,6 +3489,14 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.yummyBonusStore = 0;
 
     newObject.clothing = getEmptyClothingSet();
+    // this is to make people spawn with clothes, for testing of weapons and armour
+    // newObject.clothing.hat = getObject( 86782 );
+    // newObject.clothing.tunic = getObject( 86778 );
+    // newObject.clothing.backpack = getObject( 86115 );
+    // newObject.clothing.bottom = getObject( 86716 );
+    // newObject.clothing.frontShoe = getObject( 87803 );
+    // newObject.clothing.backShoe = getObject( 87803 );
+    // newObject.holdingID = 86122;
 
     for( int c=0; c<NUM_CLOTHING_PIECES; c++ ) {
         newObject.clothingEtaDecay[c] = 0;
@@ -3613,17 +3719,23 @@ void processLoggedInPlayer( Socket *inSock,
         newObject.isTutorial = false;
         
         // else starts at civ outskirts (lone Eve)
-        int startX, startY;
-        getEvePosition( newObject.email, &startX, &startY );
+        int startX = 0;
+        int startY = 0;
+
 
         if( SettingsManager::getIntSetting( "forceEveLocation", 0 ) ) {
-
-            startX = 
-                SettingsManager::getIntSetting( "forceEveLocationX", 0 );
-            startY = 
-                SettingsManager::getIntSetting( "forceEveLocationY", 0 );
+            if( newObject.nation == -1 ) {
+                startX = 
+                    SettingsManager::getIntSetting( "forceEveLocationX", 0 );
+                startY = 
+                    SettingsManager::getIntSetting( "forceEveLocationY", 0 );
+                } else {
+                    getNationPosition( newObject.nation, &startX, &startY );
+                }
             }
-        
+            else {
+                getEvePosition( newObject.email, &startX, &startY );
+            }        
         
         newObject.xs = startX;
         newObject.ys = startY;
@@ -4838,6 +4950,86 @@ void monumentStep() {
 
 
 
+// inPlayerName may be destroyed inside this function
+// returns a uniquified name, sometimes newly allocated.
+// return value destroyed by caller
+char *getUniqueCursableName( char *inPlayerName ) {
+    
+    char dup = isNameDuplicateForCurses( inPlayerName );
+    
+    if( ! dup ) {
+        return inPlayerName;
+        }
+    else {
+        
+        int targetPersonNumber = 1;
+        
+        char *fullName = stringDuplicate( inPlayerName );
+
+        while( dup ) {
+            // try next roman numeral
+            targetPersonNumber++;
+            
+            int personNumber = targetPersonNumber;            
+        
+            SimpleVector<char> romanNumeralList;
+        
+            while( personNumber >= 100 ) {
+                romanNumeralList.push_back( 'C' );
+                personNumber -= 100;
+                }
+            while( personNumber >= 50 ) {
+                romanNumeralList.push_back( 'L' );
+                personNumber -= 50;
+                }
+            while( personNumber >= 40 ) {
+                romanNumeralList.push_back( 'X' );
+                romanNumeralList.push_back( 'L' );
+                personNumber -= 40;
+                }
+            while( personNumber >= 10 ) {
+                romanNumeralList.push_back( 'X' );
+                personNumber -= 10;
+                }
+            while( personNumber >= 9 ) {
+                romanNumeralList.push_back( 'I' );
+                romanNumeralList.push_back( 'X' );
+                personNumber -= 9;
+                }
+            while( personNumber >= 5 ) {
+                romanNumeralList.push_back( 'V' );
+                personNumber -= 5;
+                }
+            while( personNumber >= 4 ) {
+                romanNumeralList.push_back( 'I' );
+                romanNumeralList.push_back( 'V' );
+                personNumber -= 4;
+                }
+            while( personNumber >= 1 ) {
+                romanNumeralList.push_back( 'I' );
+                personNumber -= 1;
+                }
+            
+            char *romanString = romanNumeralList.getElementString();
+
+            delete [] fullName;
+            
+            fullName = autoSprintf( "%s %s", inPlayerName, romanString );
+            delete [] romanString;
+            
+            dup = isNameDuplicateForCurses( fullName );
+            }
+        
+        delete [] inPlayerName;
+        
+        return fullName;
+        }
+    
+    }
+
+
+
+
 int main() {
 
     memset( allowedSayCharMap, false, 256 );
@@ -4940,6 +5132,14 @@ int main() {
         SettingsManager::getIntSetting( "familySpan", 2 );
     
     
+    readNameGivingPhrases( "babyNamingPhrases", &nameGivingPhrases );
+    readNameGivingPhrases( "familyNamingPhrases", &familyNameGivingPhrases );
+    readNameGivingPhrases( "nationNames", &nationNames );
+
+    printf("Nations are:\n");
+    for(int i=0; i<nationNames.size(); i++ ) {
+        printf("%s\n", nationNames.getElementDirect( i ) );
+    }
     readPhrases( "babyNamingPhrases", &nameGivingPhrases );
     readPhrases( "familyNamingPhrases", &familyNameGivingPhrases );
 
@@ -4996,9 +5196,9 @@ int main() {
     initTransBankFinish();
     
 
-    // defaults to one hour
+    // defaults to two hours
     int epochSeconds = 
-        SettingsManager::getIntSetting( "epochSeconds", 3600 );
+        SettingsManager::getIntSetting( "epochSeconds", 7200 );
     
     setTransitionEpoch( epochSeconds );
 
@@ -5018,7 +5218,7 @@ int main() {
     
     SocketPoll sockPoll;
     
-    
+
     
     SocketServer server( port, 256 );
     
@@ -5724,6 +5924,8 @@ int main() {
 
         SimpleVector<int> playerIndicesToSendHealingAbout;
 
+        SimpleVector<SoundLocation> soundsToSend;
+
         SimpleVector<GraveInfo> newGraves;
         SimpleVector<GraveMoveInfo> newGraveMoves;
 
@@ -5783,57 +5985,215 @@ int main() {
 
                 if( !riding &&
                     curOverObj->permanent && curOverObj->deadlyDistance > 0 ) {
-                    
+
+                    // check for armour transition
+
+
+
+                    double totalPercentage = 0.0;
+
+                    double headHit = 5.0;
+                    if( nextPlayer->clothing.hat != NULL && nextPlayer->clothing.hat->hitScalar > 0.0 ) {
+                        headHit *= nextPlayer->clothing.hat->hitScalar;
+                        // printf("Player is wearing a hat\n");
+                    }
+                    totalPercentage += headHit;
+
+                    double chestHit = 45.0;
+                    if( nextPlayer->clothing.tunic != NULL && nextPlayer->clothing.tunic->hitScalar > 0.0 ) {
+                        chestHit *= nextPlayer->clothing.tunic->hitScalar;
+                        // printf("Player is wearing a tunic\n");
+                    }
+                    totalPercentage += chestHit;
+
+                    double armsHit = 15.0;
+                    if( nextPlayer->clothing.backpack != NULL && nextPlayer->clothing.backpack->hitScalar > 0.0 ) {
+                        armsHit *= nextPlayer->clothing.backpack->hitScalar;
+                        // printf("Player is wearing a shield\n");
+                    }
+                    totalPercentage += armsHit;
+
+                    double groinHit = 15.0;
+                    if( nextPlayer->clothing.bottom != NULL && nextPlayer->clothing.bottom->hitScalar > 0.0 ) {
+                        groinHit *= nextPlayer->clothing.bottom->hitScalar;
+                        // printf("Player is wearing faulds\n");
+                    }
+                    totalPercentage += groinHit;
+
+                    double leftLegHit = 10.0;
+                    if( nextPlayer->clothing.frontShoe != NULL && nextPlayer->clothing.frontShoe->hitScalar > 0.0 ) {
+                        leftLegHit *= nextPlayer->clothing.frontShoe->hitScalar;
+                        // printf("Player is wearing a left shoe\n");
+                    }
+                    totalPercentage += leftLegHit;
+
+                    double rightLegHit = 10.0;
+                    if( nextPlayer->clothing.backShoe != NULL && nextPlayer->clothing.backShoe->hitScalar > 0.0 ) {
+                        rightLegHit *= nextPlayer->clothing.backShoe->hitScalar;
+                        // printf("Player is wearing a right shoe\n");
+                    }
+                    totalPercentage += rightLegHit;
+
+                    double hitRand = randSource.getRandomDouble() * totalPercentage;
+                    ObjectRecord *hitArmour;
+                    char hitLocation;
+
+                    if( hitRand < headHit ) {
+                        // AppLog::info("Player is hit in the head\n");
+                        hitArmour = nextPlayer->clothing.hat;
+                        hitLocation = 'h';
+                    } else if ( hitRand < headHit + chestHit ) {
+                        // AppLog::info("Player is hit in the chest\n");
+                        hitArmour = nextPlayer->clothing.tunic;
+                        hitLocation = 't';
+                    } else if ( hitRand < headHit + chestHit + armsHit ) {
+                        // AppLog::info("Player is hit in the arms\n");
+                        hitArmour = nextPlayer->clothing.backpack;
+                        hitLocation = 'p';
+                    } else if ( hitRand < headHit + chestHit + armsHit + groinHit ) {
+                        // AppLog::info("Player is hit in the groin\n");
+                        hitArmour = nextPlayer->clothing.bottom;
+                        hitLocation = 'b';
+                    } else if ( hitRand < headHit + chestHit + armsHit + groinHit + leftLegHit ) {
+                        // AppLog::info("Player is hit in the left leg\n");
+                        hitArmour = nextPlayer->clothing.frontShoe;
+                        hitLocation = 'l';
+                    } else if ( hitRand < headHit + chestHit + armsHit + groinHit + leftLegHit + rightLegHit ) {
+                        // AppLog::info("Player is hit in the right leg\n");
+                        hitArmour = nextPlayer->clothing.backShoe;
+                        hitLocation = 'r';
+                    } else {
+                        printf("Whoops, maths. hitRand is %f and total percentage is %f\n",
+                            hitRand, totalPercentage );
+                    }
+
+                    char performKill = false;
+
+                    // check if hitPlayer is wearing armour in hit location
+                    if( hitArmour != NULL ) {
+                        // check if there is a transition between the weapon and the armour
+                        // printf("Player is wearing a %s\n", hitArmour->description );
+                        TransRecord *armourTrans = 
+                            getPTrans( curOverObj->id, 
+                                    hitArmour->id, false, false );
+                        if( armourTrans != NULL ) {
+                            // perform the transition
+                            AppLog::info("Deadly interaction blocked\n");
+                            
+                            SoundLocation armourSound;
+                            armourSound.objectID = hitArmour->id;
+                            armourSound.soundIndex = 2;
+                            armourSound.x = nextPlayer->xd;
+                            armourSound.y = nextPlayer->yd;
+                            soundsToSend.push_back( armourSound );
+
+
+                            switch( hitLocation ) {
+                                case 'h':
+                                    if( armourTrans->newTarget != nextPlayer->clothing.hat->id ) {
+                                        playerIndicesToSendUpdatesAbout.push_back(
+                                            getLiveObjectIndex( nextPlayer->id ) );
+                                        nextPlayer->clothing.hat = getObject( armourTrans->newTarget );
+                                    }
+                                    break;
+                                case 't':
+                                    if( armourTrans->newTarget != nextPlayer->clothing.tunic->id ) {
+                                        playerIndicesToSendUpdatesAbout.push_back(
+                                            getLiveObjectIndex( nextPlayer->id ) );
+                                        nextPlayer->clothing.tunic = getObject( armourTrans->newTarget );
+                                    }
+                                    break;
+                                case 'p':
+                                    if( armourTrans->newTarget != nextPlayer->clothing.backpack->id ) {
+                                        playerIndicesToSendUpdatesAbout.push_back(
+                                            getLiveObjectIndex( nextPlayer->id ) );
+                                        nextPlayer->clothing.backpack = getObject( armourTrans->newTarget );
+                                    }
+                                    break;
+                                case 'b':
+                                    if( armourTrans->newTarget != nextPlayer->clothing.bottom->id ) {
+                                        playerIndicesToSendUpdatesAbout.push_back(
+                                            getLiveObjectIndex( nextPlayer->id ) );
+                                        nextPlayer->clothing.bottom = getObject( armourTrans->newTarget );
+                                    }
+                                    break;
+                                case 'l':
+                                    if( armourTrans->newTarget != nextPlayer->clothing.frontShoe->id ) {
+                                        playerIndicesToSendUpdatesAbout.push_back(
+                                            getLiveObjectIndex( nextPlayer->id ) );
+                                        nextPlayer->clothing.frontShoe = getObject( armourTrans->newTarget );
+                                    }
+                                    break;
+                                case 'r':
+                                    if( armourTrans->newTarget != nextPlayer->clothing.backShoe->id ) {
+                                        playerIndicesToSendUpdatesAbout.push_back(
+                                            getLiveObjectIndex( nextPlayer->id ) );
+                                        nextPlayer->clothing.backShoe = getObject( armourTrans->newTarget );
+                                    }
+                                    break;
+                            }
+                        } else {
+                            // proceed with the kill code
+                            performKill = true;
+                        }
+                    } else {
+                        // proceed with the kill code
+                        performKill = true;
+                    }
+
+
+
                     addDeadlyMapSpot( curPos );
                     
-                    setDeathReason( nextPlayer, 
-                                    "killed",
-                                    curOverID );
-                    
-                    nextPlayer->deathSourceID = curOverID;
-                    
-                    if( curOverObj->isUseDummy ) {
-                        nextPlayer->deathSourceID = curOverObj->useDummyParent;
-                        }
-
-                    nextPlayer->errorCauseString =
-                        "Player killed by permanent object";
-                    
-                    if( ! nextPlayer->dying ) {
-                        int staggerTime = 
-                            SettingsManager::getIntSetting(
-                                "deathStaggerTime", 20 );
+                    if( performKill ) {
+                        setDeathReason( nextPlayer, 
+                                        "killed",
+                                        curOverID );
                         
-                        double currentTime = 
-                            Time::getCurrentTime();
+                        nextPlayer->deathSourceID = curOverID;
                         
-                        nextPlayer->dying = true;
-                        nextPlayer->dyingETA = 
-                            currentTime + staggerTime;
-
-                        playerIndicesToSendDyingAbout.
-                            push_back( 
-                                getLiveObjectIndex( 
-                                    nextPlayer->id ) );
-                        }
-                    else {
-                        // already dying, and getting attacked again
-                        
-                        // halve their remaining stagger time
-                        double currentTime = 
-                            Time::getCurrentTime();
-                        
-                        double staggerTimeLeft = 
-                            nextPlayer->dyingETA - currentTime;
-                        
-                        if( staggerTimeLeft > 0 ) {
-                            staggerTimeLeft /= 2;
-                            nextPlayer->dyingETA = 
-                                currentTime + staggerTimeLeft;
+                        if( curOverObj->isUseDummy ) {
+                            nextPlayer->deathSourceID = curOverObj->useDummyParent;
                             }
-                        }
-                
+
+                        nextPlayer->errorCauseString =
+                            "Player killed by permanent object";
+                        
+                        if( ! nextPlayer->dying ) {
+                            int staggerTime = 
+                                SettingsManager::getIntSetting(
+                                    "deathStaggerTime", 20 );
+                            
+                            double currentTime = 
+                                Time::getCurrentTime();
+                            
+                            nextPlayer->dying = true;
+                            nextPlayer->dyingETA = 
+                                currentTime + staggerTime;
+
+                            playerIndicesToSendDyingAbout.
+                                push_back( 
+                                    getLiveObjectIndex( 
+                                        nextPlayer->id ) );
+                            }
+                        else {
+                            // already dying, and getting attacked again
+                            
+                            // halve their remaining stagger time
+                            double currentTime = 
+                                Time::getCurrentTime();
+                            
+                            double staggerTimeLeft = 
+                                nextPlayer->dyingETA - currentTime;
+                            
+                            if( staggerTimeLeft > 0 ) {
+                                staggerTimeLeft /= 2;
+                                nextPlayer->dyingETA = 
+                                    currentTime + staggerTimeLeft;
+                                }
+                            }
                     
+                        }
                     // generic on-person
                     TransRecord *r = 
                         getPTrans( curOverID, 0 );
@@ -6547,6 +6907,9 @@ int main() {
                                 nextPlayer->name = autoSprintf( "%s %s",
                                                                 eveName, 
                                                                 close );
+                                nextPlayer->name = getUniqueCursableName( 
+                                    nextPlayer->name );
+
                                 logName( nextPlayer->id,
                                          nextPlayer->email,
                                          nextPlayer->name );
@@ -6554,12 +6917,11 @@ int main() {
                                 }
                             }
 
-                        if( nextPlayer->holdingID < 0 &&
-                            nextPlayer->babyIDs->size() > 0 &&
-                            nextPlayer->babyIDs->getElementIndex(
-                                - nextPlayer->holdingID ) != -1 ) {
+                        if( nextPlayer->holdingID < 0 ) {
 
-                            // we're holding one of our babies
+                            // we're holding a baby
+                            // (no longer matters if it's our own baby)
+                            // (we let adoptive parents name too)
                             
                             LiveObject *babyO =
                                 getLiveObject( - nextPlayer->holdingID );
@@ -6583,12 +6945,86 @@ int main() {
                                     babyO->name = autoSprintf( "%s%s",
                                                                close, 
                                                                lastName );
+
+                                    int spaceCount = 0;
+                                    int lastSpaceIndex = -1;
+
+                                    int nameLen = strlen( babyO->name );
+                                    for( int s=0; s<nameLen; s++ ) {
+                                        if( babyO->name[s] == ' ' ) {
+                                            lastSpaceIndex = s;
+                                            spaceCount++;
+                                            }
+                                        }
+                                    
+                                    if( spaceCount > 1 ) {
+                                        // remove suffix from end
+                                        babyO->name[ lastSpaceIndex ] = '\0';
+                                        }
+                                    
+                                    babyO->name = getUniqueCursableName( 
+                                        babyO->name );
+                                    
                                     logName( babyO->id,
                                              babyO->email,
                                              babyO->name );
                                     
                                     playerIndicesToSendNamesAbout.push_back( 
                                         getLiveObjectIndex( babyO->id ) );
+                                    }
+                                }
+                            }
+                        else {
+                            // not holding anyone
+                        
+                            char *name = isBabyNamingSay( m.saidText );
+                                
+                            if( name != NULL && strcmp( name, "" ) != 0 ) {
+                                // still, check if we're naming a nearby,
+                                // nameless non-baby
+                                GridPos thisPos = getPlayerPos( nextPlayer );
+                                
+                                // don't consider anyone who is too far away
+                                double closestDist = 20;
+                                LiveObject *closestOther = NULL;
+                                
+                                for( int j=0; j<numLive; j++ ) {
+                                    LiveObject *otherPlayer = 
+                                        players.getElement(j);
+                                    
+                                    if( otherPlayer != nextPlayer &&
+                                        computeAge( otherPlayer ) >= babyAge &&
+                                        otherPlayer->name == NULL ) {
+                                        
+                                        GridPos otherPos = 
+                                            getPlayerPos( otherPlayer );
+                                        
+                                        double dist =
+                                            distance( thisPos, otherPos );
+                                        
+                                        if( dist < closestDist ) {
+                                            closestDist = dist;
+                                            closestOther = otherPlayer;
+                                            }
+                                        }
+                                    }
+                                if( closestOther != NULL ) {
+                                    const char *close = 
+                                        findCloseFirstName( name );
+                                    
+                                    closestOther->name = 
+                                        stringDuplicate( close );
+                                    
+                                    closestOther->name = getUniqueCursableName( 
+                                        closestOther->name );
+
+                                    logName( closestOther->id,
+                                             closestOther->email,
+                                             closestOther->name );
+                                    
+                                    playerIndicesToSendNamesAbout.push_back( 
+                                        getLiveObjectIndex( 
+                                            closestOther->id ) );
                                     }
                                 }
                             }
@@ -6678,78 +7114,300 @@ int main() {
                                         getHitPlayer( m.x, m.y, true );
                                     
                                     char someoneHit = false;
+                                    char performKill = false;
 
                                     if( hitPlayer != NULL ) {
                                         someoneHit = true;
-                                        // break the connection with 
-                                        // them, eventually
-                                        // let them stagger a bit first
 
-                                        hitPlayer->murderSourceID =
-                                            nextPlayer->holdingID;
-                                        
-                                        hitPlayer->murderPerpID =
-                                            nextPlayer->id;
-                                        
-                                        // brand this player as a murderer
-                                        nextPlayer->everKilledOther = true;
+                                        double totalPercentage = 0.0;
 
-                                        if( hitPlayer->murderPerpEmail 
-                                            != NULL ) {
-                                            delete [] 
-                                                hitPlayer->murderPerpEmail;
+                                        double headHit = 5.0;
+                                        if( hitPlayer->clothing.hat != NULL && hitPlayer->clothing.hat->hitScalar > 0.0 ) {
+                                            headHit *= hitPlayer->clothing.hat->hitScalar;
+                                            // printf("Player is wearing a hat\n");
+                                        }
+                                        totalPercentage += headHit;
+
+                                        double chestHit = 45.0;
+                                        if( hitPlayer->clothing.tunic != NULL && hitPlayer->clothing.tunic->hitScalar > 0.0 ) {
+                                            chestHit *= hitPlayer->clothing.tunic->hitScalar;
+                                            // printf("Player is wearing a tunic\n");
+                                        }
+                                        totalPercentage += chestHit;
+
+                                        double armsHit = 15.0;
+                                        if( hitPlayer->clothing.backpack != NULL && hitPlayer->clothing.backpack->hitScalar > 0.0 ) {
+                                            armsHit *= hitPlayer->clothing.backpack->hitScalar;
+                                            // printf("Player is wearing a shield\n");
+                                        }
+                                        totalPercentage += armsHit;
+
+                                        double groinHit = 15.0;
+                                        if( hitPlayer->clothing.bottom != NULL && hitPlayer->clothing.bottom->hitScalar > 0.0 ) {
+                                            groinHit *= hitPlayer->clothing.bottom->hitScalar;
+                                            // printf("Player is wearing faulds\n");
+                                        }
+                                        totalPercentage += groinHit;
+
+                                        double leftLegHit = 10.0;
+                                        if( hitPlayer->clothing.frontShoe != NULL && hitPlayer->clothing.frontShoe->hitScalar > 0.0 ) {
+                                            leftLegHit *= hitPlayer->clothing.frontShoe->hitScalar;
+                                            // printf("Player is wearing a left shoe\n");
+                                        }
+                                        totalPercentage += leftLegHit;
+
+                                        double rightLegHit = 10.0;
+                                        if( hitPlayer->clothing.backShoe != NULL && hitPlayer->clothing.backShoe->hitScalar > 0.0 ) {
+                                            rightLegHit *= hitPlayer->clothing.backShoe->hitScalar;
+                                            // printf("Player is wearing a right shoe\n");
+                                        }
+                                        totalPercentage += rightLegHit;
+
+                                        // printf("Total percentage is %f\n", totalPercentage);
+
+                                        double hitRand = randSource.getRandomDouble() * totalPercentage;
+                                        // printf("hitRand is %f\n", hitRand);
+                                        ObjectRecord *hitArmour;
+                                        char hitLocation;
+
+                                        // printf("Chances to hit each area:\n");
+                                        // printf("Head %f\n", headHit );
+                                        // printf("Chest %f\n", headHit + chestHit );
+                                        // printf("Arms %f\n", headHit + chestHit + armsHit );
+                                        // printf("Groin %f\n", headHit + chestHit + armsHit + groinHit );
+                                        // printf("Left leg %f\n", headHit + chestHit + armsHit + groinHit + leftLegHit );
+                                        // printf("Right leg %f\n", headHit + chestHit + armsHit + groinHit + leftLegHit + rightLegHit );
+                                        
+                                        if( hitRand < headHit ) {
+                                            // AppLog::info("Player is hit in the head\n");
+                                            hitArmour = hitPlayer->clothing.hat;
+                                            hitLocation = 'h';
+                                        } else if ( hitRand < headHit + chestHit ) {
+                                            // AppLog::info("Player is hit in the chest\n");
+                                            hitArmour = hitPlayer->clothing.tunic;
+                                            hitLocation = 't';
+                                        } else if ( hitRand < headHit + chestHit + armsHit ) {
+                                            // AppLog::info("Player is hit in the arms\n");
+                                            hitArmour = hitPlayer->clothing.backpack;
+                                            hitLocation = 'p';
+                                        } else if ( hitRand < headHit + chestHit + armsHit + groinHit ) {
+                                            // AppLog::info("Player is hit in the groin\n");
+                                            hitArmour = hitPlayer->clothing.bottom;
+                                            hitLocation = 'b';
+                                        } else if ( hitRand < headHit + chestHit + armsHit + groinHit + leftLegHit ) {
+                                            // AppLog::info("Player is hit in the left leg\n");
+                                            hitArmour = hitPlayer->clothing.frontShoe;
+                                            hitLocation = 'l';
+                                        } else if ( hitRand < headHit + chestHit + armsHit + groinHit + leftLegHit + rightLegHit ) {
+                                            // AppLog::info("Player is hit in the right leg\n");
+                                            hitArmour = hitPlayer->clothing.backShoe;
+                                            hitLocation = 'r';
+                                        } else {
+                                            printf("Whoops, maths. hitRand is %f and total percentage is %f\n",
+                                                hitRand, totalPercentage );
+                                        }
+
+
+                                        SoundLocation attackSound;
+                                        attackSound.objectID = nextPlayer->holdingID;
+                                        attackSound.soundIndex = 1;
+                                        attackSound.x = nextPlayer->xd;
+                                        attackSound.y = nextPlayer->yd;
+                                        soundsToSend.push_back( attackSound );
+
+                                        // check if hitPlayer is wearing armour in hit location
+                                        if( hitArmour != NULL ) {
+                                            // check if there is a transition between the weapon and the armour
+                                            // printf("Player is wearing a %s with hitScalar %f\n", hitArmour->description, hitArmour->hitScalar );
+                                            TransRecord *armourTrans = 
+                                                getPTrans( nextPlayer->holdingID, 
+                                                        hitArmour->id, false, false );
+                                            if( armourTrans != NULL ) {
+                                                // perform the transition
+                                                AppLog::info("KILL attempt blocked\n");
+                                                
+                                                SoundLocation armourSound;
+                                                armourSound.objectID = hitArmour->id;
+                                                armourSound.soundIndex = 2;
+                                                armourSound.x = hitPlayer->xd;
+                                                armourSound.y = hitPlayer->yd;
+                                                soundsToSend.push_back( armourSound );
+
+                                                if( armourTrans->newActor != nextPlayer->holdingID ) {
+                                                    playerIndicesToSendUpdatesAbout.push_back(
+                                                        getLiveObjectIndex( nextPlayer->id ) );
+                                                    // SoundLocation attackBreakSound;
+                                                    // attackBreakSound.objectID = nextPlayer->holdingID;
+                                                    // attackBreakSound.soundIndex = 3;
+                                                    // attackBreakSound.x = nextPlayer->xd;
+                                                    // attackBreakSound.y = nextPlayer->yd;
+                                                    // soundsToSend.push_back( attackBreakSound );
+                                                    nextPlayer->holdingID = armourTrans->newActor;
+                                                }
+
+                                                switch( hitLocation ) {
+                                                    case 'h':
+                                                        if( armourTrans->newTarget != hitPlayer->clothing.hat->id ) {
+                                                            playerIndicesToSendUpdatesAbout.push_back(
+                                                                getLiveObjectIndex( hitPlayer->id ) );
+                                                            hitPlayer->clothing.hat = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
+                                                        }
+                                                        break;
+                                                    case 't':
+                                                        if( armourTrans->newTarget != hitPlayer->clothing.tunic->id ) {
+                                                            playerIndicesToSendUpdatesAbout.push_back(
+                                                                getLiveObjectIndex( hitPlayer->id ) );
+                                                            hitPlayer->clothing.tunic = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
+                                                        }
+                                                        break;
+                                                    case 'p':
+                                                        if( armourTrans->newTarget != hitPlayer->clothing.backpack->id ) {
+                                                            playerIndicesToSendUpdatesAbout.push_back(
+                                                                getLiveObjectIndex( hitPlayer->id ) );
+                                                            hitPlayer->clothing.backpack = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
+                                                        }
+                                                        break;
+                                                    case 'b':
+                                                        if( armourTrans->newTarget != hitPlayer->clothing.bottom->id ) {
+                                                            playerIndicesToSendUpdatesAbout.push_back(
+                                                                getLiveObjectIndex( hitPlayer->id ) );
+                                                            hitPlayer->clothing.bottom = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
+                                                        }
+                                                        break;
+                                                    case 'l':
+                                                        if( armourTrans->newTarget != hitPlayer->clothing.frontShoe->id ) {
+                                                            playerIndicesToSendUpdatesAbout.push_back(
+                                                                getLiveObjectIndex( hitPlayer->id ) );
+                                                            hitPlayer->clothing.frontShoe = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
+                                                        }
+                                                        break;
+                                                    case 'r':
+                                                        if( armourTrans->newTarget != hitPlayer->clothing.backShoe->id ) {
+                                                            playerIndicesToSendUpdatesAbout.push_back(
+                                                                getLiveObjectIndex( hitPlayer->id ) );
+                                                            hitPlayer->clothing.backShoe = getObject( armourTrans->newTarget );
+                                                            // SoundLocation armourBreakSound;
+                                                            // armourBreakSound.objectID = hitArmour->id;
+                                                            // armourBreakSound.soundIndex = 3;
+                                                            // armourBreakSound.x = hitPlayer->xd;
+                                                            // armourBreakSound.y = hitPlayer->yd;
+                                                            // soundsToSend.push_back( armourBreakSound );
+                                                        }
+                                                        break;
+                                                }
+                                            } else {
+                                                // proceed with the kill code
+                                                performKill = true;
                                             }
-                                        
-                                        hitPlayer->murderPerpEmail =
-                                            stringDuplicate( 
-                                                nextPlayer->email );
-                                        
+                                        } else {
+                                            // proceed with the kill code
+                                            performKill = true;
+                                        }
 
-                                        setDeathReason( hitPlayer, 
-                                                        "killed",
-                                                        nextPlayer->holdingID );
 
-                                        // if not already dying
-                                        if( ! hitPlayer->dying ) {
-                                            int staggerTime = 
-                                                SettingsManager::getIntSetting(
-                                                    "deathStaggerTime", 20 );
+                                        if( performKill ){
+                                            // break the connection with 
+                                            // them, eventually
+                                            // let them stagger a bit first
+
+                                            hitPlayer->murderSourceID =
+                                                nextPlayer->holdingID;
                                             
-                                            double currentTime = 
-                                                Time::getCurrentTime();
-                                            
-                                            hitPlayer->dying = true;
-                                            hitPlayer->dyingETA = 
-                                                currentTime + staggerTime;
+                                            hitPlayer->murderPerpID =
+                                                nextPlayer->id;
 
-                                            playerIndicesToSendDyingAbout.
-                                                push_back( 
-                                                    getLiveObjectIndex( 
-                                                        hitPlayer->id ) );
-                                        
-                                            hitPlayer->errorCauseString =
-                                                "Player killed by other player";
+                                            // brand this player as a murderer
+                                            nextPlayer->everKilledOther = true;
+
+                                            if( hitPlayer->murderPerpEmail 
+                                                != NULL ) {
+                                                delete [] 
+                                                    hitPlayer->murderPerpEmail;
+                                                }
+                                            
+                                            hitPlayer->murderPerpEmail =
+                                                stringDuplicate( 
+                                                    nextPlayer->email );
+                                            
+
+                                            setDeathReason( hitPlayer, 
+                                                            "killed",
+                                                            nextPlayer->holdingID );
+
+                                            // if not already dying
+                                            if( ! hitPlayer->dying ) {
+                                                int staggerTime = 
+                                                    SettingsManager::getIntSetting(
+                                                        "deathStaggerTime", 20 );
+                                                
+                                                double currentTime = 
+                                                    Time::getCurrentTime();
+                                                
+                                                hitPlayer->dying = true;
+                                                hitPlayer->dyingETA = 
+                                                    currentTime + staggerTime;
+
+                                                playerIndicesToSendDyingAbout.
+                                                    push_back( 
+                                                        getLiveObjectIndex( 
+                                                            hitPlayer->id ) );
+                                            
+                                                hitPlayer->errorCauseString =
+                                                    "Player killed by other player";
+                                                }
+                                            else {
+                                                // already dying, 
+                                                // and getting attacked again
+                            
+                                                // halve their remaining 
+                                                // stagger time
+                                                double currentTime = 
+                                                    Time::getCurrentTime();
+                                                
+                                                double staggerTimeLeft = 
+                                                    hitPlayer->dyingETA - 
+                                                    currentTime;
+                            
+                                                if( staggerTimeLeft > 0 ) {
+                                                    staggerTimeLeft /= 2;
+                                                    hitPlayer->dyingETA = 
+                                                        currentTime + 
+                                                        staggerTimeLeft;
+                                                    }
+                                                }
+                                            // } else {
+                                            //     printf("Player blocked attack\n");
                                             }
-                                         else {
-                                             // already dying, 
-                                             // and getting attacked again
-                        
-                                             // halve their remaining 
-                                             // stagger time
-                                             double currentTime = 
-                                                 Time::getCurrentTime();
-                                             
-                                             double staggerTimeLeft = 
-                                                 hitPlayer->dyingETA - 
-                                                 currentTime;
-                        
-                                             if( staggerTimeLeft > 0 ) {
-                                                 staggerTimeLeft /= 2;
-                                                 hitPlayer->dyingETA = 
-                                                     currentTime + 
-                                                     staggerTimeLeft;
-                                                 }
-                                             }
                                         }
                                     
                                     
@@ -6766,6 +7424,7 @@ int main() {
                                     TransRecord *rHit = NULL;
                                     
                                     if( someoneHit ) {
+                                        printf("Someone was hit\n");
                                         // last use on target specifies
                                         // grave and weapon change on hit
                                         // non-last use (r above) specifies
@@ -6776,7 +7435,7 @@ int main() {
                                                       0, false, true );
                                         
                                         if( rHit != NULL &&
-                                            rHit->newTarget > 0 ) {
+                                            rHit->newTarget > 0 && performKill ) {
                                             hitPlayer->customGraveID = 
                                                 rHit->newTarget;
                                             }
@@ -6788,11 +7447,18 @@ int main() {
                                                       0, true, false );
                                         
                                         if( woundHit != NULL &&
-                                            woundHit->newTarget > 0 ) {
+                                            woundHit->newTarget > 0 && performKill ) {
+                                            printf("There is a wound transition producing a %s\n", getObject( woundHit->newTarget )->description );
                                             
+                                            if( hitPlayer->holdingWound ) {
+                                                printf("Player is holding a wound\n");
+                                            } else {
+                                                printf("Player is not holding a wound\n");
+                                            }
                                             // don't drop their wound
                                             if( hitPlayer->holdingID != 0 &&
                                                 ! hitPlayer->holdingWound ) {
+                                                printf("Handling the drop\n");
                                                 handleDrop( 
                                                     m.x, m.y, 
                                                     hitPlayer,
@@ -6801,6 +7467,7 @@ int main() {
                                             hitPlayer->holdingID = 
                                                 woundHit->newTarget;
                                             hitPlayer->holdingWound = true;
+                                            printf("Player is now holding the wound\n");
                                             
                                             playerIndicesToSendUpdatesAbout.
                                                 push_back( 
@@ -6841,7 +7508,7 @@ int main() {
                                     if( r != NULL ) {
                                     
                                         if( hitPlayer != NULL &&
-                                            r->newTarget != 0 ) {
+                                            r->newTarget != 0 && performKill ) {
                                         
                                             hitPlayer->embeddedWeaponID = 
                                                 r->newTarget;
@@ -6875,7 +7542,7 @@ int main() {
                                                     }
                                                 }
                                             }
-                                        else if( hitPlayer == NULL &&
+                                        else if( ( hitPlayer == NULL || !performKill ) &&
                                                  isMapSpotEmpty( m.x, 
                                                                  m.y ) ) {
                                             // no player hit, and target ground
@@ -7611,7 +8278,7 @@ int main() {
 
                                 // is anyone there?
                                 LiveObject *hitPlayer = 
-                                    getHitPlayer( m.x, m.y, false, 5 );
+                                    getHitPlayer( m.x, m.y, false, babyAge );
                                 
                                 if( hitPlayer != NULL &&
                                     !hitPlayer->heldByOther &&
@@ -7778,7 +8445,8 @@ int main() {
                                 int hitIndex;
                                 LiveObject *hitPlayer = 
                                     getHitPlayer( m.x, m.y, 
-                                                  false, 5, -1, &hitIndex );
+                                                  false, 
+                                                  babyAge, -1, &hitIndex );
                                 
                                 if( hitPlayer != NULL && holdingDrugs ) {
                                     // can't even feed baby drugs
@@ -10347,6 +11015,46 @@ int main() {
                 }
             }
 
+        unsigned char *soundMessage = NULL;
+        int soundMessageLength = 0;
+        
+        if( soundsToSend.size() > 0 ) {
+            SimpleVector<char> soundWorking;
+            soundWorking.appendElementString( "SND\n" );
+            
+            int numAdded = 0;
+            for( int i=0; i<soundsToSend.size(); i++ ) {
+                SoundLocation *nextSound = soundsToSend.getElement( i );
+
+                char *line = autoSprintf( "%d %d %d %d\n", nextSound->objectID, nextSound->soundIndex,
+                    nextSound->x, nextSound->y );
+
+                numAdded++;
+                soundWorking.appendElementString( line );
+                delete [] line;
+                }
+            
+            soundWorking.push_back( '#' );
+            
+            if( numAdded > 0 ) {
+
+                char *soundMessageText = soundWorking.getElementString();
+                
+                soundMessageLength = strlen( soundMessageText );
+                
+                if( soundMessageLength < maxUncompressedSize ) {
+                    soundMessage = (unsigned char*)soundMessageText;
+                    }
+                else {
+                    // compress for all players once here
+                    soundMessage = makeCompressedMessage( 
+                        soundMessageText, 
+                        soundMessageLength, &soundMessageLength );
+                    
+                    delete [] soundMessageText;
+                    }
+                }
+            }
 
 
 
@@ -10942,6 +11650,21 @@ int main() {
                         }
                     }
 
+                if( soundMessage != NULL ) {
+                    int numSent = 
+                        nextPlayer->sock->send( 
+                            soundMessage, 
+                            soundMessageLength, 
+                            false, false );
+                    
+                    if( numSent != soundMessageLength ) {
+                        setDeathReason( nextPlayer, "disconnected" );
+
+                        nextPlayer->error = true;
+                        nextPlayer->errorCauseString =
+                            "Socket write failed";
+                        }
+                    }
 
                 
 

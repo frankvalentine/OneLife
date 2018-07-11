@@ -3,6 +3,30 @@ This file only list changes to game code.  Changes to content can be found here:
 http://onehouronelife.com/updateLog.php
 
 
+
+Version 123    ???
+
+--Fixed memory leak and uninitialized variable.
+
+--Fixed bad memory access in audio callback when shutting down.
+
+--Fixed memory leak in update process.
+
+
+
+
+Server Fixes
+
+--Anyone can name a held baby, even adoptive parents.  They get the last name
+  of their adoptive parent.  An unnamed person who is older than baby age can
+  be named by anyone nearby, but they will never have a last name.
+
+--If a name isn't unique as far as the curse system is concerned, a roman
+  numeral suffix (II, III, IV, V, etc.) is automatically added.
+
+
+
+
 Version 122    2018-July-6
 
 --Back to updating hard-coded version number with every client update.  Not

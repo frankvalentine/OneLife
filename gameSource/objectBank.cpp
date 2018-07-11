@@ -42,6 +42,9 @@ static SimpleVector<int> personObjectIDs;
 // track female people
 static SimpleVector<int> femalePersonObjectIDs;
 
+// track female people
+static SimpleVector<int> malePersonObjectIDs;
+
 // track monument calls
 static SimpleVector<int> monumentCallObjectIDs;
 
@@ -568,8 +571,16 @@ float initObjectBankStep() {
                             
                 next++;
                             
-                            
-                            
+
+                r->hitScalar = 0.0;
+                
+                if( strstr( lines[next], "hitScalar=" ) != NULL ) {
+                    sscanf( lines[next], "hitScalar=%f", 
+                            &( r->hitScalar ) );
+                    
+                    next++;
+                    }
+
                 r->clothingOffset.x = 0;
                 r->clothingOffset.y = 0;
                             
@@ -920,6 +931,8 @@ float initObjectBankStep() {
                     
                     if( ! r->male ) {
                         femalePersonObjectIDs.push_back( r->id );
+                        } else {
+                            malePersonObjectIDs.push_back( r->id );
                         }
 
                     if( r->race <= MAX_RACE ) {
@@ -1129,6 +1142,7 @@ void initObjectBankFinish() {
                         
                         dummyO->isUseDummy = true;
                         dummyO->useDummyParent = mainID;
+                        dummyO->hitScalar = o->hitScalar;
                         
                         if( o->creationSoundInitialOnly && d != 1 ) {
                             // only keep creation sound for last dummy
@@ -1547,6 +1561,7 @@ static void freeObjectRecord( int inID ) {
 
             personObjectIDs.deleteElementEqualTo( inID );
             femalePersonObjectIDs.deleteElementEqualTo( inID );
+            malePersonObjectIDs.deleteElementEqualTo( inID );
             monumentCallObjectIDs.deleteElementEqualTo( inID );
             deathMarkerObjectIDs.deleteElementEqualTo( inID );
             
@@ -1621,6 +1636,7 @@ void freeObjectBank() {
 
     personObjectIDs.deleteAll();
     femalePersonObjectIDs.deleteAll();
+    malePersonObjectIDs.deleteAll();
     monumentCallObjectIDs.deleteAll();
     deathMarkerObjectIDs.deleteAll();
     
@@ -1672,6 +1688,7 @@ int reAddObject( ObjectRecord *inObject,
                         inObject->speedMult,
                         inObject->heldOffset,
                         inObject->clothing,
+                        1.0,
                         inObject->clothingOffset,
                         inObject->deadlyDistance,
                         inObject->useDistance,
@@ -1937,6 +1954,7 @@ int addObject( const char *inDescription,
                float inSpeedMult,
                doublePair inHeldOffset,
                char inClothing,
+               float inHitScalar,
                doublePair inClothingOffset,
                int inDeadlyDistance,
                int inUseDistance,
@@ -2067,7 +2085,7 @@ int addObject( const char *inDescription,
         
         lines.push_back( autoSprintf( "mapChance=%f#biomes_%s", 
                                       inMapChance, inBiomes ) );
-        
+
         lines.push_back( autoSprintf( "heatValue=%d", inHeatValue ) );
         lines.push_back( autoSprintf( "rValue=%f", inRValue ) );
 
@@ -2093,6 +2111,8 @@ int addObject( const char *inDescription,
                                       inHeldOffset.x, inHeldOffset.y ) );
 
         lines.push_back( autoSprintf( "clothing=%c", inClothing ) );
+
+        lines.push_back( autoSprintf( "hitScalar=%f", inHitScalar ) );
 
         lines.push_back( autoSprintf( "clothingOffset=%f,%f",
                                       inClothingOffset.x, 
@@ -2328,7 +2348,7 @@ int addObject( const char *inDescription,
     
     
     r->mapChance = inMapChance;
-    
+
     r->heatValue = inHeatValue;
     r->rValue = inRValue;
 
@@ -2351,6 +2371,7 @@ int addObject( const char *inDescription,
     r->speedMult = inSpeedMult;
     r->heldOffset = inHeldOffset;
     r->clothing = inClothing;
+    r->hitScalar = inHitScalar;
     r->clothingOffset = inClothingOffset;
     r->deadlyDistance = inDeadlyDistance;
     r->useDistance = inUseDistance;
@@ -2533,6 +2554,7 @@ int addObject( const char *inDescription,
     
     personObjectIDs.deleteElementEqualTo( newID );
     femalePersonObjectIDs.deleteElementEqualTo( newID );
+    malePersonObjectIDs.deleteElementEqualTo( newID );
 
     for( int i=0; i<=MAX_RACE; i++ ) {
         racePersonObjectIDs[ i ].deleteElementEqualTo( newID );
@@ -2543,6 +2565,8 @@ int addObject( const char *inDescription,
         
         if( ! r->male ) {
             femalePersonObjectIDs.push_back( newID );
+            } else {
+                malePersonObjectIDs.push_back( newID );
             }
         
         
@@ -2589,7 +2613,7 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
                        char inHeldNotInPlaceYet,
                        ClothingSet inClothing,
                        double inScale ) {
-    
+
     HoldingPos returnHoldingPos = { false, {0, 0}, 0 };
     
     SimpleVector <int> frontArmIndices;
@@ -2650,8 +2674,24 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
         }
     objectLayerCutoff = -1;
     
+    if( inClothing.backpack != NULL && inClothing.backpack->hitScalar > 0.0 ) {
+        // shield behind everything
+            
+        // relative to body
 
-    for( int i=0; i<limit; i++ ) {
+        doublePair cPos = add( inObject->spritePos[bodyIndex], 
+                               inClothing.backpack->clothingOffset );
+        if( inFlipH ) {
+            cPos.x *= -1;
+            }
+        cPos = add( cPos, inPos );
+        
+        drawObject( inClothing.backpack, 2, cPos, inRot, true,
+                    inFlipH, -1, 0, false, false, emptyClothing );
+        }
+
+
+    for( int i = 0; i < limit; i++ ) {
         if( inObject->spriteSkipDrawing != NULL &&
             inObject->spriteSkipDrawing[i] ) {
             continue;
@@ -2806,7 +2846,7 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
                 bottomPos = cPos;
                 bottomRot = inRot;
                 }
-            if( inClothing.backpack != NULL ) {
+            if( inClothing.backpack != NULL && inClothing.backpack->hitScalar == 0.0 ) {
             
 
 
@@ -2835,7 +2875,7 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
                             tunicPos, tunicRot, true,
                             inFlipH, -1, 0, false, false, emptyClothing );
                 }
-            if( inClothing.backpack != NULL ) {
+            if( inClothing.backpack != NULL && inClothing.backpack->hitScalar == 0 ) {
                 drawObject( inClothing.backpack, 2, 
                             backpackPos, backpackRot,
                             true,
@@ -2964,7 +3004,7 @@ HoldingPos drawObject( ObjectRecord *inObject, doublePair inPos, double inRot,
                        ClothingSet inClothing,
                        int inNumContained, int *inContainedIDs,
                        SimpleVector<int> *inSubContained ) {
-    
+
     drawObject( inObject, 0, inPos, inRot, inWorn, inFlipH, inAge, 
                 inHideClosestArm,
                 inHideAllLimbs,
@@ -3205,6 +3245,17 @@ int getRandomFemalePersonObject() {
                                         femalePersonObjectIDs.size() - 1  ) );
     }
 
+int getRandomMalePersonObject() {
+    
+    if( malePersonObjectIDs.size() == 0 ) {
+        return -1;
+        }
+    
+        
+    return malePersonObjectIDs.getElementDirect( 
+        randSource.getRandomBoundedInt( 0, 
+                                        malePersonObjectIDs.size() - 1  ) );
+    }
 
 int *getRaces( int *outNumRaces ) {
     *outNumRaces = raceList.size();

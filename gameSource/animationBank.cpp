@@ -2013,8 +2013,62 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
     animLayerCutoff = -1;
     
 
-    for( int i=0; i<limit; i++ ) {
+    if( inClothing.backpack != NULL && inClothing.backpack->hitScalar > 0.0 ) {
+
+        doublePair offset = inClothing.backpack->clothingOffset;
+        if( inFlipH ) {
+            offset.x *= -1;
+            }
+    
+        doublePair cPos = add( workingSpritePos[bodyIndex], offset );
         
+        cPos = add( cPos, inPos );
+        
+        backpackPos = cPos;
+
+
+
+
+
+        int numCont = 0;
+        int *cont = NULL;
+        if( inClothingContained != NULL ) {    
+            numCont = inClothingContained[5].size();
+            cont = inClothingContained[5].getElementArray();
+            }
+
+        char used;
+        drawObjectAnim( inClothing.backpack->id, 
+                        clothingAnimType, 
+                        inFrameTime,
+                        inAnimFade, 
+                        clothingFadeTargetAnimType,
+                        inFadeTargetFrameTime,
+                        inFrozenRotFrameTime,
+                        &used,
+                        endAnimType,
+                        endAnimType,
+                        backpackPos,
+                        backpackRot,
+                        true,
+                        inFlipH,
+                        -1,
+                        0,
+                        false,
+                        false,
+                        emptyClothing,
+                        NULL,
+                        numCont, cont,
+                        NULL );
+
+        if( cont != NULL ) {
+            delete [] cont;
+            }
+        }
+    
+
+    for( int i=0; i<limit; i++ ) {
+
         if( obj->spriteSkipDrawing[i] ) {
             continue;
             }
@@ -2025,7 +2079,7 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
             continue;
             }
 
-        
+
         doublePair spritePos = workingSpritePos[i];
         double rot = workingRot[i];
         
@@ -2267,7 +2321,7 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
                 
                 backpackPos = cPos;
                 }
-            
+
             }
         else if( i == topBackArmIndex ) {
             // draw under top of back arm
@@ -2345,7 +2399,7 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
                     delete [] cont;
                     }
                 }
-            if( inClothing.backpack != NULL ) {
+            if( inClothing.backpack != NULL && inClothing.backpack->hitScalar == 0.0 ) {
                 int numCont = 0;
                 int *cont = NULL;
                 if( inClothingContained != NULL ) {    
@@ -2382,6 +2436,7 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
                     }
                 }
             }
+
         
 
         if( ! skipSprite && 

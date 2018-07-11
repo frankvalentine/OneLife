@@ -111,7 +111,7 @@ static char savingSpeech = false;
 static char savingSpeechColor = false;
 static char savingSpeechMask = false;
 
-
+static double deathAge = 120.0;
 
 
 // most recent home at end
@@ -734,6 +734,7 @@ typedef enum messageType {
     GRAVE_MOVE,
     FORCED_SHUTDOWN,
     COMPRESSED_MESSAGE,
+    SOUND,
     UNKNOWN
     } messageType;
 
@@ -824,6 +825,9 @@ messageType getMessageType( char *inMessage ) {
         }
     else if( strcmp( copy, "SD" ) == 0 ) {
         returnValue = FORCED_SHUTDOWN;
+        }
+    else if( strcmp( copy, "SND" ) == 0 ) {
+        returnValue = SOUND;
         }
     
     delete [] copy;
@@ -4946,7 +4950,7 @@ void LivingLifePage::draw( doublePair inViewCenter,
 
                         // vary by a tiny amount, so we don't change
                         // the way they are sorted relative to other objects
-                        depth += ( 60.0 - o->age ) / 6000.0;
+                        depth += ( deathAge - o->age ) / 6000.0;
                         }
                     
                     drawQueue.insert( drawRec, depth );
@@ -9789,6 +9793,7 @@ void LivingLifePage::step() {
                 delete [] lines[0];
                 }
             
+            char idBuffer[500];
             
             for( int i=1; i<numLines; i++ ) {
                 
@@ -9796,8 +9801,7 @@ void LivingLifePage::step() {
                 int oldX, oldY;
                 float speed = 0;
                                 
-                char *idBuffer = new char[500];
-
+                
                 int numRead = sscanf( lines[i], "%d %d %d %499s %d %d %d %f",
                                       &x, &y, &floorID, 
                                       idBuffer, &responsiblePlayerID,
@@ -10510,8 +10514,6 @@ void LivingLifePage::step() {
                             }
                         }
                     }
-                
-                delete [] idBuffer;
                 
                 delete [] lines[i];
                 }
@@ -12063,6 +12065,8 @@ void LivingLifePage::step() {
                         o.currentPos.x = o.xd;
                         o.currentPos.y = o.yd;
 
+                        o.destTruncated = false;
+
                         o.heldPosOverride = false;
                         o.heldPosOverrideAlmostOver = false;
                         o.heldObjectPos = o.currentPos;
@@ -13329,6 +13333,66 @@ void LivingLifePage::step() {
                 }
             delete [] lines;
             }
+        else if( type == SOUND ) {
+            int numLines;
+            char **lines = split( message, "\n", &numLines );
+            
+            if( numLines > 0 ) {
+                // skip first
+                delete [] lines[0];
+                }
+            
+            
+            for( int i=1; i<numLines; i++ ) {
+
+
+                int objectID;
+                int soundIndex;
+                int x;
+                int y;
+                int numRead = sscanf( lines[i], "%d %d %d %d",
+                                      &( objectID ), &( soundIndex ), &( x ), &( y ) );
+
+                if( numRead == 4 ) {
+                    ObjectRecord *soundObject = getObject( objectID );
+                    SoundUsage sound;
+                    char play = false;
+                    switch( soundIndex ) {
+                        case 0:
+                            if( soundObject->creationSound.numSubSounds > 0 ) {
+                                sound = soundObject->creationSound;
+                                play = true;
+                            }
+                            break;
+                        case 1:
+                            if( soundObject->usingSound.numSubSounds > 0 ) {
+                                sound = soundObject->usingSound;
+                                play= true;
+                            }
+                            break;
+                        case 2:
+                            if( soundObject->eatingSound.numSubSounds > 0 ) {
+                                sound = soundObject->eatingSound;
+                                play = true;
+                            }
+                            break;
+                        case 3:
+                            if( soundObject->decaySound.numSubSounds > 0 ) {
+                                sound = soundObject->decaySound;
+                                play = true;
+                            }
+                            
+                            break;
+                        }
+                    if( play ) {
+                        playSound( sound, getVectorFromCamera( x, y ) );
+                    }
+
+                    }
+                delete [] lines[i];
+                }
+            delete [] lines;
+            }
         else if( type == HEALED ) {
             int numLines;
             char **lines = split( message, "\n", &numLines );
@@ -13653,7 +13717,7 @@ void LivingLifePage::step() {
                         mHungerSlipVisible = 0;
                         }
                     else if( ourLiveObject->foodStore <= 4 &&
-                             computeCurrentAge( ourLiveObject ) < 57 ) {
+                             computeCurrentAge( ourLiveObject ) < ( deathAge - 3 ) ) {
                         
                         // don't play hunger sounds at end of life
                         // because it interrupts our end-of-life song
@@ -13689,7 +13753,7 @@ void LivingLifePage::step() {
                         }
 
                     if( ourLiveObject->foodStore > 4 ||
-                        computeCurrentAge( ourLiveObject ) >= 57 ) {
+                        computeCurrentAge( ourLiveObject ) >= ( deathAge - 3 ) ) {
                         // restore music
                         setMusicLoudness( musicLoudness );
                         
