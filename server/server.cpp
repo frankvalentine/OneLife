@@ -7122,7 +7122,6 @@ int main() {
                                         double totalPercentage = 0.0;
 
                                         double headHit = 5.0;
-                                        headHit = 0.0;
                                         if( hitPlayer->clothing.hat != NULL && hitPlayer->clothing.hat->hitScalar > 0.0 ) {
                                             headHit *= hitPlayer->clothing.hat->hitScalar;
                                             // printf("Player is wearing a hat\n");
@@ -7130,7 +7129,6 @@ int main() {
                                         totalPercentage += headHit;
 
                                         double chestHit = 45.0;
-                                        chestHit = 0.0;
                                         if( hitPlayer->clothing.tunic != NULL && hitPlayer->clothing.tunic->hitScalar > 0.0 ) {
                                             chestHit *= hitPlayer->clothing.tunic->hitScalar;
                                             // printf("Player is wearing a tunic\n");
@@ -7145,7 +7143,6 @@ int main() {
                                         totalPercentage += armsHit;
 
                                         double groinHit = 15.0;
-                                        groinHit = 0.0;
                                         if( hitPlayer->clothing.bottom != NULL && hitPlayer->clothing.bottom->hitScalar > 0.0 ) {
                                             groinHit *= hitPlayer->clothing.bottom->hitScalar;
                                             // printf("Player is wearing faulds\n");
@@ -7153,7 +7150,6 @@ int main() {
                                         totalPercentage += groinHit;
 
                                         double leftLegHit = 10.0;
-                                        leftLegHit = 0.0;
                                         if( hitPlayer->clothing.frontShoe != NULL && hitPlayer->clothing.frontShoe->hitScalar > 0.0 ) {
                                             leftLegHit *= hitPlayer->clothing.frontShoe->hitScalar;
                                             // printf("Player is wearing a left shoe\n");
@@ -7161,17 +7157,27 @@ int main() {
                                         totalPercentage += leftLegHit;
 
                                         double rightLegHit = 10.0;
-                                        rightLegHit = 0.0;
                                         if( hitPlayer->clothing.backShoe != NULL && hitPlayer->clothing.backShoe->hitScalar > 0.0 ) {
                                             rightLegHit *= hitPlayer->clothing.backShoe->hitScalar;
                                             // printf("Player is wearing a right shoe\n");
                                         }
                                         totalPercentage += rightLegHit;
 
+                                        // printf("Total percentage is %f\n", totalPercentage);
+
                                         double hitRand = randSource.getRandomDouble() * totalPercentage;
+                                        // printf("hitRand is %f\n", hitRand);
                                         ObjectRecord *hitArmour;
                                         char hitLocation;
 
+                                        // printf("Chances to hit each area:\n");
+                                        // printf("Head %f\n", headHit );
+                                        // printf("Chest %f\n", headHit + chestHit );
+                                        // printf("Arms %f\n", headHit + chestHit + armsHit );
+                                        // printf("Groin %f\n", headHit + chestHit + armsHit + groinHit );
+                                        // printf("Left leg %f\n", headHit + chestHit + armsHit + groinHit + leftLegHit );
+                                        // printf("Right leg %f\n", headHit + chestHit + armsHit + groinHit + leftLegHit + rightLegHit );
+                                        
                                         if( hitRand < headHit ) {
                                             // AppLog::info("Player is hit in the head\n");
                                             hitArmour = hitPlayer->clothing.hat;
@@ -7212,7 +7218,7 @@ int main() {
                                         // check if hitPlayer is wearing armour in hit location
                                         if( hitArmour != NULL ) {
                                             // check if there is a transition between the weapon and the armour
-                                            // printf("Player is wearing a %s\n", hitArmour->description );
+                                            // printf("Player is wearing a %s with hitScalar %f\n", hitArmour->description, hitArmour->hitScalar );
                                             TransRecord *armourTrans = 
                                                 getPTrans( nextPlayer->holdingID, 
                                                         hitArmour->id, false, false );
