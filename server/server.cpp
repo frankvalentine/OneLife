@@ -1486,7 +1486,7 @@ char isFatherAge( LiveObject *inPlayer ) {
 int computeFoodCapacity( LiveObject *inPlayer ) {
     int ageInYears = lrint( computeAge( inPlayer ) );
     
-    if( ageInYears < 44 ) {
+    if( ageInYears < forceDeathAge - 16 ) {
         
         if( ageInYears > 16 ) {
             ageInYears = 16;
