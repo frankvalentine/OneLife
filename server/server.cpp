@@ -75,6 +75,8 @@ int minPickupBabyAge = 10;
 int babyAge = 5;
 
 double forceDeathAge = 120;
+double adultAge = 20;
+double oldAge = 104;
 
 
 double minSayGapInSeconds = 1.0;
@@ -1486,10 +1488,10 @@ char isFatherAge( LiveObject *inPlayer ) {
 int computeFoodCapacity( LiveObject *inPlayer ) {
     int ageInYears = lrint( computeAge( inPlayer ) );
     
-    if( ageInYears < 44 ) {
+    if( ageInYears < oldAge ) {
         
-        if( ageInYears > 16 ) {
-            ageInYears = 16;
+        if( ageInYears > adultAge - 4 ) {
+            ageInYears = adultAge - 4;
             }
         
         return ageInYears + 4;
