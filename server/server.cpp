@@ -77,6 +77,7 @@ int babyAge = 5;
 double forceDeathAge = 120;
 double adultAge = 20;
 double oldAge = 104;
+double fertileAge = 14;
 
 
 double minSayGapInSeconds = 1.0;
@@ -1464,7 +1465,7 @@ char isFertileAge( LiveObject *inPlayer ) {
                     
     char f = getFemale( inPlayer );
                     
-    if( age >= 14 && age <= 40 && f ) {
+    if( age >= fertileAge && age <= oldAge && f ) {
         return true;
         }
     else {
@@ -1477,7 +1478,7 @@ char isFatherAge( LiveObject *inPlayer ) {
                     
     char f = getFemale( inPlayer );
                     
-    if( age >= 14 && !f ) {
+    if( age >= fertileAge && !f ) {
         return true;
         }
     else {
