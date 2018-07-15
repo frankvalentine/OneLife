@@ -2691,7 +2691,7 @@ void handleDrop( int inX, int inY, LiveObject *inDroppingPlayer,
         char *fileName = autoSprintf( "nation%dPositionX", inDroppingPlayer->nation );
         SettingsManager::setSetting( fileName, targetX );
         fileName = autoSprintf( "nation%dPositionY", inDroppingPlayer->nation );
-        SettingsManager::setSetting( fileName, targetY - 1 );
+        SettingsManager::setSetting( fileName, targetY );
     }
                                 
 
