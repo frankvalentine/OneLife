@@ -2472,6 +2472,11 @@ GridPos findClosestEmptyMapSpot( int inX, int inY, int inMaxPointsToCheck,
     return p;
     }
 
+int getNationSpawnObjectID( int inNation ) {
+    char *fileName = autoSprintf( "nation%dSpawnObjectID", inNation );
+    return SettingsManager::getIntSetting( fileName, -1 );
+}
+
 
 
 
@@ -2653,6 +2658,14 @@ void handleDrop( int inX, int inY, LiveObject *inDroppingPlayer,
 
     transferHeldContainedToMap( inDroppingPlayer, targetX, targetY );
     
+
+    if( inDroppingPlayer->holdingID == getNationSpawnObjectID( inDroppingPlayer->nation )) {
+        // player is dropping the unique spawn object of their nation
+        char *fileName = autoSprintf( "nation%dPositionX", inDroppingPlayer->nation );
+        SettingsManager::setSetting( fileName, targetX );
+        fileName = autoSprintf( "nation%dPositionY", inDroppingPlayer->nation );
+        SettingsManager::setSetting( fileName, targetY - 1 );
+    }
                                 
 
     setResponsiblePlayer( -1 );
