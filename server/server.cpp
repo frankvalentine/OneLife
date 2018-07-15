@@ -5125,7 +5125,7 @@ int main() {
 
     printf("Nations are:\n");
     for(int i=0; i<nationNames.size(); i++ ) {
-        printf("%s\n", nationNames.getElementDirect( i ) );
+        printf("%s spawn id %d\n", nationNames.getElementDirect( i ), getNationSpawnObjectID( i ) );
     }
     readPhrases( "babyNamingPhrases", &nameGivingPhrases );
     readPhrases( "familyNamingPhrases", &familyNameGivingPhrases );
