@@ -3390,7 +3390,7 @@ void processLoggedInPlayer( Socket *inSock,
     readNameGivingPhrases( "nationMembers", &nationMembers );
 
     newObject.nation = getNation( inEmail, &nationMembers );
-    printf("Player is in nation %d %s\n", newObject.nation, getNationName( inEmail, &nationMembers ));
+    AppLog::infoF( "Player is in nation %d %s\n", newObject.nation, getNationName( inEmail, &nationMembers ));
 
     nationMembers.deallocateStringElements();
     
@@ -3688,7 +3688,7 @@ void processLoggedInPlayer( Socket *inSock,
 
 
     if( unmatchedAdams.size() > 0 && inTutorialNumber == 0 ) {
-        printf("There are %d unmatched Adams, spawning as an Eve\n", unmatchedAdams.size());
+        AppLog::infoF( "There are %d unmatched Adams, spawning as an Eve\n", unmatchedAdams.size());
         // new Eve
         // she starts almost full grown
 
@@ -3709,7 +3709,7 @@ void processLoggedInPlayer( Socket *inSock,
                                             unmatchedAdams.size() - 1 );
         
         spawnTarget = unmatchedAdams.getElementDirect( spawnTargetIndex );
-        printf("Spawning Eve next to %d\n", spawnTarget->id);
+        AppLog::infoF( "Spawning Eve next to %d\n", spawnTarget->id);
 
         const char *lastName = "";
         if( spawnTarget->name != NULL ) {
@@ -3830,7 +3830,7 @@ void processLoggedInPlayer( Socket *inSock,
                 
                 if( totalTemp >= choice ) {
                     spawnTarget = p;
-                    printf("Choosing %d as mother\n", p->id);
+                    AppLog::infoF("Choosing %d as mother\n", p->id);
                     break;
                     }
                 }
@@ -3872,7 +3872,7 @@ void processLoggedInPlayer( Socket *inSock,
 
 
     if( spawnTarget == NULL ) {
-        printf("No eligible mothers or no eligible fathers and no unmatched Adams, spawning as an Adam\n");
+        AppLog::info("No eligible mothers or no eligible fathers and no unmatched Adams, spawning as an Adam\n");
         // new Adam
         // he starts almost full grown
 
