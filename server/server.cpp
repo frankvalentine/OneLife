@@ -3221,7 +3221,7 @@ char *getNationName( char *inEmail, SimpleVector<char*> *inMemberList ) {
             return &( testString[ phraseLen ] );
             }
         }
-    return NULL;
+    return "NULL";
     }
 
 
