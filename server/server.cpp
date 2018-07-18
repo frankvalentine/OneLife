@@ -2504,6 +2504,46 @@ int getNationSpawnObjectID( int inNation ) {
     return SettingsManager::getIntSetting( fileName, -1 );
 }
 
+void readNameGivingPhrases( const char *inSettingsName, 
+                            SimpleVector<char*> *inList ) {
+    char *cont = SettingsManager::getSettingContents( inSettingsName, "" );
+    
+    if( strcmp( cont, "" ) == 0 ) {
+        delete [] cont;
+        return;    
+        }
+    
+    int numParts;
+    char **parts = split( cont, "\n", &numParts );
+    delete [] cont;
+    
+    for( int i=0; i<numParts; i++ ) {
+        if( strcmp( parts[i], "" ) != 0 ) {
+            inList->push_back( stringToUpperCase( parts[i] ) );
+            }
+        delete [] parts[i];
+        }
+    delete [] parts;
+    }
+
+
+char *getNationName( char *inEmail, SimpleVector<char*> *inMemberList ) {
+    for( int i=0; i<inMemberList->size(); i++ ) {
+        char *email = stringToUpperCase( inEmail );
+        char *testString = inMemberList->getElementDirect( i );
+
+        if( strstr( testString, email ) == testString ) {
+            // hit
+            int phraseLen = strlen( email );
+            // skip spaces after
+            while( testString[ phraseLen ] == ' ' ) {
+                phraseLen++;
+                }
+            return &( testString[ phraseLen ] );
+            }
+        }
+    return NULL;
+    }
 
 
 
@@ -2692,6 +2732,11 @@ void handleDrop( int inX, int inY, LiveObject *inDroppingPlayer,
         SettingsManager::setSetting( fileName, targetX );
         fileName = autoSprintf( "nation%dPositionY", inDroppingPlayer->nation );
         SettingsManager::setSetting( fileName, targetY );
+
+        SimpleVector<char*> nationMembers;
+        readNameGivingPhrases( "nationMembers", &nationMembers );
+        AppLog::infoF( "Nation %s spawn point set to %d %d\n", getNationName( inDroppingPlayer->email, &nationMembers ), targetX, targetY );
+        nationMembers.deallocateStringElements();
     }
                                 
 
@@ -3206,23 +3251,6 @@ static LiveObject *getHitPlayer( int inX, int inY,
     }
 
 
-char *getNationName( char *inEmail, SimpleVector<char*> *inMemberList ) {
-    for( int i=0; i<inMemberList->size(); i++ ) {
-        char *email = stringToUpperCase( inEmail );
-        char *testString = inMemberList->getElementDirect( i );
-
-        if( strstr( testString, email ) == testString ) {
-            // hit
-            int phraseLen = strlen( email );
-            // skip spaces after
-            while( testString[ phraseLen ] == ' ' ) {
-                phraseLen++;
-                }
-            return &( testString[ phraseLen ] );
-            }
-        }
-    return NULL;
-    }
 
 
 int getNation( char *inEmail, SimpleVector<char*> *inMemberList ) {
@@ -3329,29 +3357,6 @@ char *getUniqueCursableName( char *inPlayerName ) {
         }
     
     }
-
-void readNameGivingPhrases( const char *inSettingsName, 
-                            SimpleVector<char*> *inList ) {
-    char *cont = SettingsManager::getSettingContents( inSettingsName, "" );
-    
-    if( strcmp( cont, "" ) == 0 ) {
-        delete [] cont;
-        return;    
-        }
-    
-    int numParts;
-    char **parts = split( cont, "\n", &numParts );
-    delete [] cont;
-    
-    for( int i=0; i<numParts; i++ ) {
-        if( strcmp( parts[i], "" ) != 0 ) {
-            inList->push_back( stringToUpperCase( parts[i] ) );
-            }
-        delete [] parts[i];
-        }
-    delete [] parts;
-    }
-
 
 void processLoggedInPlayer( Socket *inSock,
                             SimpleVector<char> *inSockBuffer,
@@ -3904,8 +3909,10 @@ void processLoggedInPlayer( Socket *inSock,
                 }
             else {
                 getNationPosition( newObject.nation, &startX, &startY );
+                AppLog::infoF("Adam's nation spawn point is %d %d\n", startX, startY );
             }
             
+            AppLog::infoF("Spawning Adam at %d %d\n", startX, startY );
             newObject.xs = startX;
             newObject.ys = startY;
             
