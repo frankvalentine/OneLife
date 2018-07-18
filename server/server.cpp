@@ -3439,13 +3439,7 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.clothing = getEmptyClothingSet();
     // this is to make people spawn with clothes, for testing of weapons and armour
     if( newObject.nation == 5 ) {
-        newObject.clothing.hat = getObject( 86782 );
-        newObject.clothing.tunic = getObject( 86778 );
-        newObject.clothing.backpack = getObject( 198 );
-        newObject.clothing.bottom = getObject( 86716 );
-        newObject.clothing.frontShoe = getObject( 87803 );
-        newObject.clothing.backShoe = getObject( 87803 );
-        newObject.holdingID = 86278;
+        newObject.clothing.hat = getObject( 86278 );
     }
 
     for( int c=0; c<NUM_CLOTHING_PIECES; c++ ) {
