@@ -2504,6 +2504,46 @@ int getNationSpawnObjectID( int inNation ) {
     return SettingsManager::getIntSetting( fileName, -1 );
 }
 
+void readNameGivingPhrases( const char *inSettingsName, 
+                            SimpleVector<char*> *inList ) {
+    char *cont = SettingsManager::getSettingContents( inSettingsName, "" );
+    
+    if( strcmp( cont, "" ) == 0 ) {
+        delete [] cont;
+        return;    
+        }
+    
+    int numParts;
+    char **parts = split( cont, "\n", &numParts );
+    delete [] cont;
+    
+    for( int i=0; i<numParts; i++ ) {
+        if( strcmp( parts[i], "" ) != 0 ) {
+            inList->push_back( stringToUpperCase( parts[i] ) );
+            }
+        delete [] parts[i];
+        }
+    delete [] parts;
+    }
+
+
+char *getNationName( char *inEmail, SimpleVector<char*> *inMemberList ) {
+    for( int i=0; i<inMemberList->size(); i++ ) {
+        char *email = stringToUpperCase( inEmail );
+        char *testString = inMemberList->getElementDirect( i );
+
+        if( strstr( testString, email ) == testString ) {
+            // hit
+            int phraseLen = strlen( email );
+            // skip spaces after
+            while( testString[ phraseLen ] == ' ' ) {
+                phraseLen++;
+                }
+            return &( testString[ phraseLen ] );
+            }
+        }
+    return NULL;
+    }
 
 
 
@@ -2692,6 +2732,11 @@ void handleDrop( int inX, int inY, LiveObject *inDroppingPlayer,
         SettingsManager::setSetting( fileName, targetX );
         fileName = autoSprintf( "nation%dPositionY", inDroppingPlayer->nation );
         SettingsManager::setSetting( fileName, targetY );
+
+        SimpleVector<char*> nationMembers;
+        readNameGivingPhrases( "nationMembers", &nationMembers );
+        AppLog::infoF( "Nation %s spawn point set to %d %d\n", getNationName( inDroppingPlayer->email, &nationMembers ), targetX, targetY );
+        nationMembers.deallocateStringElements();
     }
                                 
 
@@ -3206,23 +3251,6 @@ static LiveObject *getHitPlayer( int inX, int inY,
     }
 
 
-char *getNationName( char *inEmail, SimpleVector<char*> *inMemberList ) {
-    for( int i=0; i<inMemberList->size(); i++ ) {
-        char *email = stringToUpperCase( inEmail );
-        char *testString = inMemberList->getElementDirect( i );
-
-        if( strstr( testString, email ) == testString ) {
-            // hit
-            int phraseLen = strlen( email );
-            // skip spaces after
-            while( testString[ phraseLen ] == ' ' ) {
-                phraseLen++;
-                }
-            return &( testString[ phraseLen ] );
-            }
-        }
-    return NULL;
-    }
 
 
 int getNation( char *inEmail, SimpleVector<char*> *inMemberList ) {
@@ -3330,33 +3358,12 @@ char *getUniqueCursableName( char *inPlayerName ) {
     
     }
 
-void readNameGivingPhrases( const char *inSettingsName, 
-                            SimpleVector<char*> *inList ) {
-    char *cont = SettingsManager::getSettingContents( inSettingsName, "" );
-    
-    if( strcmp( cont, "" ) == 0 ) {
-        delete [] cont;
-        return;    
-        }
-    
-    int numParts;
-    char **parts = split( cont, "\n", &numParts );
-    delete [] cont;
-    
-    for( int i=0; i<numParts; i++ ) {
-        if( strcmp( parts[i], "" ) != 0 ) {
-            inList->push_back( stringToUpperCase( parts[i] ) );
-            }
-        delete [] parts[i];
-        }
-    delete [] parts;
-    }
-
-
 void processLoggedInPlayer( Socket *inSock,
                             SimpleVector<char> *inSockBuffer,
                             char *inEmail,
                             int inTutorialNumber ) {
+    
+    printf("Starting to process new login");
     
     // reload these settings every time someone new connects
     // thus, they can be changed without restarting the server
@@ -3388,7 +3395,7 @@ void processLoggedInPlayer( Socket *inSock,
     readNameGivingPhrases( "nationMembers", &nationMembers );
 
     newObject.nation = getNation( inEmail, &nationMembers );
-    printf("Player is in nation %d %s\n", newObject.nation, getNationName( inEmail, &nationMembers ));
+    AppLog::infoF( "Player is in nation %d %s\n", newObject.nation, getNationName( inEmail, &nationMembers ));
 
     nationMembers.deallocateStringElements();
     
@@ -3435,16 +3442,10 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.yummyBonusStore = 0;
 
     newObject.clothing = getEmptyClothingSet();
-
-    newObject.clothing = getEmptyClothingSet();
     // this is to make people spawn with clothes, for testing of weapons and armour
-    // newObject.clothing.hat = getObject( 86782 );
-    // newObject.clothing.tunic = getObject( 86778 );
-    // newObject.clothing.backpack = getObject( 86115 );
-    // newObject.clothing.bottom = getObject( 86716 );
-    // newObject.clothing.frontShoe = getObject( 87803 );
-    // newObject.clothing.backShoe = getObject( 87803 );
-    // newObject.holdingID = 86122;
+    if( newObject.nation == 5 ) {
+        newObject.clothing.hat = getObject( 86278 );
+    }
 
     for( int c=0; c<NUM_CLOTHING_PIECES; c++ ) {
         newObject.clothingEtaDecay[c] = 0;
@@ -3692,7 +3693,7 @@ void processLoggedInPlayer( Socket *inSock,
 
 
     if( unmatchedAdams.size() > 0 && inTutorialNumber == 0 ) {
-        printf("There are %d unmatched Adams, spawning as an Eve\n", unmatchedAdams.size());
+        AppLog::infoF( "There are %d unmatched Adams, spawning as an Eve\n", unmatchedAdams.size());
         // new Eve
         // she starts almost full grown
 
@@ -3713,7 +3714,7 @@ void processLoggedInPlayer( Socket *inSock,
                                             unmatchedAdams.size() - 1 );
         
         spawnTarget = unmatchedAdams.getElementDirect( spawnTargetIndex );
-        printf("Spawning Eve next to %d\n", spawnTarget->id);
+        AppLog::infoF( "Spawning Eve next to %d\n", spawnTarget->id);
 
         const char *lastName = "";
         if( spawnTarget->name != NULL ) {
@@ -3835,7 +3836,7 @@ void processLoggedInPlayer( Socket *inSock,
                 
                 if( totalTemp >= choice ) {
                     spawnTarget = p;
-                    printf("Choosing %d as mother\n", p->id);
+                    AppLog::infoF("Choosing %d as mother\n", p->id);
                     break;
                     }
                 }
@@ -3877,7 +3878,7 @@ void processLoggedInPlayer( Socket *inSock,
 
 
     if( spawnTarget == NULL ) {
-        printf("No eligible mothers or no eligible fathers and no unmatched Adams, spawning as an Adam\n");
+        AppLog::info("No eligible mothers or no eligible fathers and no unmatched Adams, spawning as an Adam\n");
         // new Adam
         // he starts almost full grown
 
@@ -3909,8 +3910,10 @@ void processLoggedInPlayer( Socket *inSock,
                 }
             else {
                 getNationPosition( newObject.nation, &startX, &startY );
+                AppLog::infoF("Adam's nation spawn point is %d %d\n", startX, startY );
             }
             
+            AppLog::infoF("Spawning Adam at %d %d\n", startX, startY );
             newObject.xs = startX;
             newObject.ys = startY;
             
