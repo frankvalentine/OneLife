@@ -3717,16 +3717,17 @@ void processLoggedInPlayer( Socket *inSock,
 
         const char *lastName = "";
         if( spawnTarget->name != NULL ) {
+            printf("Adam has a name, %s\n", spawnTarget->name);
             lastName = strstr( spawnTarget->name, 
-                                " " );
+                                "ADAM " );
             
             if( lastName != NULL ) {
                 newObject.name = autoSprintf( "%s %s",
                                             eveName, 
                                             lastName );
+                newObject.name = getUniqueCursableName( newObject.name );
+                printf("Eve's name is %s\n", newObject.name );
                 }
-            newObject.name = getUniqueCursableName( newObject.name );
-            printf("Eve's name is %s\n", newObject.name );
             }
 
         printf("Spawning Eve next to Adam\n");
