@@ -5318,7 +5318,7 @@ int main() {
 
 
     initObjectBankStart( &rebuilding, true, true );
-    while( initObjectBankStep() < 1.0 );
+    while( initObjectBankStep(nationNames) < 1.0 );
     initObjectBankFinish();
 
     
@@ -7724,12 +7724,18 @@ int main() {
                         
 
                         char distanceUseAllowed = false;
+                        char actorUseAllowedByNation = true;
                         
                         if( nextPlayer->holdingID > 0 ) {
                             
                             // holding something
                             ObjectRecord *heldObj = 
                                 getObject( nextPlayer->holdingID );
+                            if( heldObj->nationId > -1 && 
+                                heldObj->nationId != nextPlayer->nation ) {
+                                // object is nation restricted
+                                actorUseAllowedByNation = false;
+                            }
                             
                             if( heldObj->useDistance > 1 ) {
                                 // it's long-distance
@@ -7750,14 +7756,14 @@ int main() {
                             }
                         
 
-                        if( distanceUseAllowed 
+                        if( actorUseAllowedByNation && ( distanceUseAllowed 
                             ||
                             isGridAdjacent( m.x, m.y,
                                             nextPlayer->xd, 
                                             nextPlayer->yd ) 
                             ||
                             ( m.x == nextPlayer->xd &&
-                              m.y == nextPlayer->yd ) ) {
+                              m.y == nextPlayer->yd ) ) ) {
                             
                             nextPlayer->actionAttempt = 1;
                             nextPlayer->actionTarget.x = m.x;
@@ -7774,11 +7780,18 @@ int main() {
                             // no diags
                             
                             int target = getMapObject( m.x, m.y );
-                            
+                            ObjectRecord *targetObj;
+                            char targetUseAllowedByNation = true;
+                            if( target != 0 ) {
+                                targetObj = getObject( target );
+                                if( targetObj->nationId > -1 &&
+                                    nextPlayer->nation != targetObj->nationId ) {
+                                    targetUseAllowedByNation = false;
+                                    }
+                                }                            
                             int oldHolding = nextPlayer->holdingID;
                             
-                            if( target != 0 ) {                                
-                                ObjectRecord *targetObj = getObject( target );
+                            if( target != 0 && targetUseAllowedByNation ) {
                                 
                                 // try using object on this target 
                                 char transApplied = false;
