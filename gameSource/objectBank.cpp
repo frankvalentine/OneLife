@@ -289,7 +289,7 @@ static void fillObjectBiomeFromString( ObjectRecord *inRecord,
 
 
 
-float initObjectBankStep() {
+float initObjectBankStep( SimpleVector<char*> inList ) {
         
     if( currentFile == cache.numFiles ) {
         return 1.0;
@@ -331,11 +331,19 @@ float initObjectBankStep() {
                 next++;
                             
                 r->description = stringDuplicate( lines[next] );
-                            
+                r->nationId = -1;
+                for( int i=0; i<inList.size(); i++ ) {
+                    if( strstr( r->description, inList.getElementDirect( i )) != NULL ) {
+                        r->nationId = i;
+                        printf("Object %d belongs to nation %d\n", r->id, r->nationId);
+                        break;
+                        }
+                    }
+                   
                 next++;
                             
                 int contRead = 0;                            
-                sscanf( lines[next], "containable=%d", 
+                sscanf( lines[next], "containable=%d",
                         &( contRead ) );
                             
                 r->containable = contRead;
@@ -1143,6 +1151,7 @@ void initObjectBankFinish() {
                         dummyO->isUseDummy = true;
                         dummyO->useDummyParent = mainID;
                         dummyO->hitScalar = o->hitScalar;
+                        dummyO->nationId = o->nationId;
                         
                         if( o->creationSoundInitialOnly && d != 1 ) {
                             // only keep creation sound for last dummy
