@@ -3363,8 +3363,6 @@ void processLoggedInPlayer( Socket *inSock,
                             char *inEmail,
                             int inTutorialNumber ) {
     
-    printf("Starting to process new login");
-    
     // reload these settings every time someone new connects
     // thus, they can be changed without restarting the server
     minFoodDecrementSeconds = 
@@ -5402,7 +5400,7 @@ int main() {
                 }
             }
         
-
+        
         
         apocalypseStep();
         monumentStep();
@@ -7874,7 +7872,20 @@ int main() {
                                     // moving from actor into new target
                                     // (and hand left empty)
                                     setResponsiblePlayer( - nextPlayer->id );
-                                    
+
+                                    if( r->newTarget == getNationSpawnObjectID( nextPlayer->nation )) {
+                                        // player is creating the unique spawn object of their nation
+                                        char *fileName = autoSprintf( "nation%dPositionX", nextPlayer->nation );
+                                        SettingsManager::setSetting( fileName, m.x );
+                                        fileName = autoSprintf( "nation%dPositionY", nextPlayer->nation );
+                                        SettingsManager::setSetting( fileName, m.y );
+
+                                        SimpleVector<char*> nationMembers;
+                                        readNameGivingPhrases( "nationMembers", &nationMembers );
+                                        AppLog::infoF( "Nation %s spawn point set to %d %d\n", getNationName( nextPlayer->email, &nationMembers ), m.x, m.y );
+                                        nationMembers.deallocateStringElements();
+                                    }
+
                                     setMapObject( m.x, m.y, r->newTarget );
                                     newGroundObject = r->newTarget;
                                     
