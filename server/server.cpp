@@ -8006,6 +8006,19 @@ int main() {
                                     if( r->newTarget > 0 
                                         && getObject( r->newTarget )->floor ) {
 
+                                        if( r->newTarget == getNationSpawnObjectID( nextPlayer->nation )) {
+                                            // player is creating the unique spawn object of their nation
+                                            char *fileName = autoSprintf( "nation%dPositionX", nextPlayer->nation );
+                                            SettingsManager::setSetting( fileName, m.x );
+                                            fileName = autoSprintf( "nation%dPositionY", nextPlayer->nation );
+                                            SettingsManager::setSetting( fileName, m.y );
+
+                                            SimpleVector<char*> nationMembers;
+                                            readNameGivingPhrases( "nationMembers", &nationMembers );
+                                            AppLog::infoF( "Nation %s spawn point set to %d %d\n", getNationName( nextPlayer->email, &nationMembers ), m.x, m.y );
+                                            nationMembers.deallocateStringElements();
+                                        }
+                                        
                                         // it turns into a floor
                                         setMapObject( m.x, m.y, 0 );
                                         
@@ -8019,6 +8032,18 @@ int main() {
                                             }
                                         }
                                     else {    
+                                        if( r->newTarget == getNationSpawnObjectID( nextPlayer->nation )) {
+                                            // player is creating the unique spawn object of their nation
+                                            char *fileName = autoSprintf( "nation%dPositionX", nextPlayer->nation );
+                                            SettingsManager::setSetting( fileName, m.x );
+                                            fileName = autoSprintf( "nation%dPositionY", nextPlayer->nation );
+                                            SettingsManager::setSetting( fileName, m.y );
+
+                                            SimpleVector<char*> nationMembers;
+                                            readNameGivingPhrases( "nationMembers", &nationMembers );
+                                            AppLog::infoF( "Nation %s spawn point set to %d %d\n", getNationName( nextPlayer->email, &nationMembers ), m.x, m.y );
+                                            nationMembers.deallocateStringElements();
+                                        }
                                         setMapObject( m.x, m.y, r->newTarget );
                                         newGroundObject = r->newTarget;
                                         }
