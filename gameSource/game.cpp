@@ -1382,8 +1382,9 @@ void drawFrame( char inUpdate ) {
                     }
                 case 3: {
                     float progress;
+                    SimpleVector<char*> nationNames;
                     for( int i=0; i<loadingStepBatchSize; i++ ) {    
-                        progress = initObjectBankStep();
+                        progress = initObjectBankStep(nationNames);
                         loadingPage->setCurrentProgress( progress );
                         }
                     

@@ -77,6 +77,7 @@ int babyAge = 5;
 double forceDeathAge = 120;
 double adultAge = 20;
 double oldAge = 104;
+double fertileAge = 14;
 
 
 double minSayGapInSeconds = 1.0;
@@ -1464,7 +1465,7 @@ char isFertileAge( LiveObject *inPlayer ) {
                     
     char f = getFemale( inPlayer );
                     
-    if( age >= 14 && age <= 40 && f ) {
+    if( age >= fertileAge && age <= oldAge && f ) {
         return true;
         }
     else {
@@ -1477,7 +1478,7 @@ char isFatherAge( LiveObject *inPlayer ) {
                     
     char f = getFemale( inPlayer );
                     
-    if( age >= 14 && !f ) {
+    if( age >= fertileAge && !f ) {
         return true;
         }
     else {
@@ -2498,6 +2499,51 @@ GridPos findClosestEmptyMapSpot( int inX, int inY, int inMaxPointsToCheck,
     return p;
     }
 
+int getNationSpawnObjectID( int inNation ) {
+    char *fileName = autoSprintf( "nation%dSpawnObjectID", inNation );
+    return SettingsManager::getIntSetting( fileName, -1 );
+}
+
+void readNameGivingPhrases( const char *inSettingsName, 
+                            SimpleVector<char*> *inList ) {
+    char *cont = SettingsManager::getSettingContents( inSettingsName, "" );
+    
+    if( strcmp( cont, "" ) == 0 ) {
+        delete [] cont;
+        return;    
+        }
+    
+    int numParts;
+    char **parts = split( cont, "\n", &numParts );
+    delete [] cont;
+    
+    for( int i=0; i<numParts; i++ ) {
+        if( strcmp( parts[i], "" ) != 0 ) {
+            inList->push_back( stringToUpperCase( parts[i] ) );
+            }
+        delete [] parts[i];
+        }
+    delete [] parts;
+    }
+
+
+char *getNationName( char *inEmail, SimpleVector<char*> *inMemberList ) {
+    for( int i=0; i<inMemberList->size(); i++ ) {
+        char *email = stringToUpperCase( inEmail );
+        char *testString = inMemberList->getElementDirect( i );
+
+        if( strstr( testString, email ) == testString ) {
+            // hit
+            int phraseLen = strlen( email );
+            // skip spaces after
+            while( testString[ phraseLen ] == ' ' ) {
+                phraseLen++;
+                }
+            return &( testString[ phraseLen ] );
+            }
+        }
+    return NULL;
+    }
 
 
 
@@ -2679,6 +2725,19 @@ void handleDrop( int inX, int inY, LiveObject *inDroppingPlayer,
 
     transferHeldContainedToMap( inDroppingPlayer, targetX, targetY );
     
+
+    if( inDroppingPlayer->holdingID == getNationSpawnObjectID( inDroppingPlayer->nation )) {
+        // player is dropping the unique spawn object of their nation
+        char *fileName = autoSprintf( "nation%dPositionX", inDroppingPlayer->nation );
+        SettingsManager::setSetting( fileName, targetX );
+        fileName = autoSprintf( "nation%dPositionY", inDroppingPlayer->nation );
+        SettingsManager::setSetting( fileName, targetY );
+
+        SimpleVector<char*> nationMembers;
+        readNameGivingPhrases( "nationMembers", &nationMembers );
+        AppLog::infoF( "Nation %s spawn point set to %d %d\n", getNationName( inDroppingPlayer->email, &nationMembers ), targetX, targetY );
+        nationMembers.deallocateStringElements();
+    }
                                 
 
     setResponsiblePlayer( -1 );
@@ -3192,23 +3251,6 @@ static LiveObject *getHitPlayer( int inX, int inY,
     }
 
 
-char *getNationName( char *inEmail, SimpleVector<char*> *inMemberList ) {
-    for( int i=0; i<inMemberList->size(); i++ ) {
-        char *email = stringToUpperCase( inEmail );
-        char *testString = inMemberList->getElementDirect( i );
-
-        if( strstr( testString, email ) == testString ) {
-            // hit
-            int phraseLen = strlen( email );
-            // skip spaces after
-            while( testString[ phraseLen ] == ' ' ) {
-                phraseLen++;
-                }
-            return &( testString[ phraseLen ] );
-            }
-        }
-    return NULL;
-    }
 
 
 int getNation( char *inEmail, SimpleVector<char*> *inMemberList ) {
@@ -3316,29 +3358,6 @@ char *getUniqueCursableName( char *inPlayerName ) {
     
     }
 
-void readNameGivingPhrases( const char *inSettingsName, 
-                            SimpleVector<char*> *inList ) {
-    char *cont = SettingsManager::getSettingContents( inSettingsName, "" );
-    
-    if( strcmp( cont, "" ) == 0 ) {
-        delete [] cont;
-        return;    
-        }
-    
-    int numParts;
-    char **parts = split( cont, "\n", &numParts );
-    delete [] cont;
-    
-    for( int i=0; i<numParts; i++ ) {
-        if( strcmp( parts[i], "" ) != 0 ) {
-            inList->push_back( stringToUpperCase( parts[i] ) );
-            }
-        delete [] parts[i];
-        }
-    delete [] parts;
-    }
-
-
 void processLoggedInPlayer( Socket *inSock,
                             SimpleVector<char> *inSockBuffer,
                             char *inEmail,
@@ -3374,7 +3393,7 @@ void processLoggedInPlayer( Socket *inSock,
     readNameGivingPhrases( "nationMembers", &nationMembers );
 
     newObject.nation = getNation( inEmail, &nationMembers );
-    printf("Player is in nation %d %s\n", newObject.nation, getNationName( inEmail, &nationMembers ));
+    AppLog::infoF( "Player is in nation %d %s\n", newObject.nation, getNationName( inEmail, &nationMembers ));
 
     nationMembers.deallocateStringElements();
     
@@ -3421,16 +3440,10 @@ void processLoggedInPlayer( Socket *inSock,
     newObject.yummyBonusStore = 0;
 
     newObject.clothing = getEmptyClothingSet();
-
-    newObject.clothing = getEmptyClothingSet();
     // this is to make people spawn with clothes, for testing of weapons and armour
-    // newObject.clothing.hat = getObject( 86782 );
-    // newObject.clothing.tunic = getObject( 86778 );
-    // newObject.clothing.backpack = getObject( 86115 );
-    // newObject.clothing.bottom = getObject( 86716 );
-    // newObject.clothing.frontShoe = getObject( 87803 );
-    // newObject.clothing.backShoe = getObject( 87803 );
-    // newObject.holdingID = 86122;
+    if( newObject.nation == 5 ) {
+        newObject.clothing.hat = getObject( 86278 );
+    }
 
     for( int c=0; c<NUM_CLOTHING_PIECES; c++ ) {
         newObject.clothingEtaDecay[c] = 0;
@@ -3678,7 +3691,7 @@ void processLoggedInPlayer( Socket *inSock,
 
 
     if( unmatchedAdams.size() > 0 && inTutorialNumber == 0 ) {
-        printf("There are %d unmatched Adams, spawning as an Eve\n", unmatchedAdams.size());
+        AppLog::infoF( "There are %d unmatched Adams, spawning as an Eve\n", unmatchedAdams.size());
         // new Eve
         // she starts almost full grown
 
@@ -3699,20 +3712,21 @@ void processLoggedInPlayer( Socket *inSock,
                                             unmatchedAdams.size() - 1 );
         
         spawnTarget = unmatchedAdams.getElementDirect( spawnTargetIndex );
-        printf("Spawning Eve next to %d\n", spawnTarget->id);
+        AppLog::infoF( "Spawning Eve next to %d\n", spawnTarget->id);
 
         const char *lastName = "";
         if( spawnTarget->name != NULL ) {
+            printf("Adam has a name, %s\n", spawnTarget->name);
             lastName = strstr( spawnTarget->name, 
-                                " " );
+                                "ADAM " );
             
             if( lastName != NULL ) {
                 newObject.name = autoSprintf( "%s %s",
                                             eveName, 
                                             lastName );
+                newObject.name = getUniqueCursableName( newObject.name );
+                printf("Eve's name is %s\n", newObject.name );
                 }
-            newObject.name = getUniqueCursableName( newObject.name );
-            printf("Eve's name is %s\n", newObject.name );
             }
 
         printf("Spawning Eve next to Adam\n");
@@ -3820,7 +3834,7 @@ void processLoggedInPlayer( Socket *inSock,
                 
                 if( totalTemp >= choice ) {
                     spawnTarget = p;
-                    printf("Choosing %d as mother\n", p->id);
+                    AppLog::infoF("Choosing %d as mother\n", p->id);
                     break;
                     }
                 }
@@ -3862,7 +3876,7 @@ void processLoggedInPlayer( Socket *inSock,
 
 
     if( spawnTarget == NULL ) {
-        printf("No eligible mothers or no eligible fathers and no unmatched Adams, spawning as an Adam\n");
+        AppLog::info("No eligible mothers or no eligible fathers and no unmatched Adams, spawning as an Adam\n");
         // new Adam
         // he starts almost full grown
 
@@ -3894,8 +3908,10 @@ void processLoggedInPlayer( Socket *inSock,
                 }
             else {
                 getNationPosition( newObject.nation, &startX, &startY );
+                AppLog::infoF("Adam's nation spawn point is %d %d\n", startX, startY );
             }
             
+            AppLog::infoF("Spawning Adam at %d %d\n", startX, startY );
             newObject.xs = startX;
             newObject.ys = startY;
             
@@ -5255,7 +5271,7 @@ int main() {
 
     printf("Nations are:\n");
     for(int i=0; i<nationNames.size(); i++ ) {
-        printf("%s\n", nationNames.getElementDirect( i ) );
+        printf("%s spawn id %d\n", nationNames.getElementDirect( i ), getNationSpawnObjectID( i ) );
     }
     readPhrases( "babyNamingPhrases", &nameGivingPhrases );
     readPhrases( "familyNamingPhrases", &familyNameGivingPhrases );
@@ -5300,7 +5316,7 @@ int main() {
 
 
     initObjectBankStart( &rebuilding, true, true );
-    while( initObjectBankStep() < 1.0 );
+    while( initObjectBankStep(nationNames) < 1.0 );
     initObjectBankFinish();
 
     
@@ -5384,7 +5400,7 @@ int main() {
                 }
             }
         
-
+        
         
         apocalypseStep();
         monumentStep();
@@ -7706,12 +7722,18 @@ int main() {
                         
 
                         char distanceUseAllowed = false;
+                        char actorUseAllowedByNation = true;
                         
                         if( nextPlayer->holdingID > 0 ) {
                             
                             // holding something
                             ObjectRecord *heldObj = 
                                 getObject( nextPlayer->holdingID );
+                            if( heldObj->nationId > -1 && 
+                                heldObj->nationId != nextPlayer->nation ) {
+                                // object is nation restricted
+                                actorUseAllowedByNation = false;
+                            }
                             
                             if( heldObj->useDistance > 1 ) {
                                 // it's long-distance
@@ -7732,14 +7754,14 @@ int main() {
                             }
                         
 
-                        if( distanceUseAllowed 
+                        if( actorUseAllowedByNation && ( distanceUseAllowed 
                             ||
                             isGridAdjacent( m.x, m.y,
                                             nextPlayer->xd, 
                                             nextPlayer->yd ) 
                             ||
                             ( m.x == nextPlayer->xd &&
-                              m.y == nextPlayer->yd ) ) {
+                              m.y == nextPlayer->yd ) ) ) {
                             
                             nextPlayer->actionAttempt = 1;
                             nextPlayer->actionTarget.x = m.x;
@@ -7756,11 +7778,18 @@ int main() {
                             // no diags
                             
                             int target = getMapObject( m.x, m.y );
-                            
+                            ObjectRecord *targetObj;
+                            char targetUseAllowedByNation = true;
+                            if( target != 0 ) {
+                                targetObj = getObject( target );
+                                if( targetObj->nationId > -1 &&
+                                    nextPlayer->nation != targetObj->nationId ) {
+                                    targetUseAllowedByNation = false;
+                                    }
+                                }                            
                             int oldHolding = nextPlayer->holdingID;
                             
-                            if( target != 0 ) {                                
-                                ObjectRecord *targetObj = getObject( target );
+                            if( target != 0 && targetUseAllowedByNation ) {
                                 
                                 // try using object on this target 
                                 char transApplied = false;
@@ -7843,7 +7872,20 @@ int main() {
                                     // moving from actor into new target
                                     // (and hand left empty)
                                     setResponsiblePlayer( - nextPlayer->id );
-                                    
+
+                                    if( r->newTarget == getNationSpawnObjectID( nextPlayer->nation )) {
+                                        // player is creating the unique spawn object of their nation
+                                        char *fileName = autoSprintf( "nation%dPositionX", nextPlayer->nation );
+                                        SettingsManager::setSetting( fileName, m.x );
+                                        fileName = autoSprintf( "nation%dPositionY", nextPlayer->nation );
+                                        SettingsManager::setSetting( fileName, m.y );
+
+                                        SimpleVector<char*> nationMembers;
+                                        readNameGivingPhrases( "nationMembers", &nationMembers );
+                                        AppLog::infoF( "Nation %s spawn point set to %d %d\n", getNationName( nextPlayer->email, &nationMembers ), m.x, m.y );
+                                        nationMembers.deallocateStringElements();
+                                    }
+
                                     setMapObject( m.x, m.y, r->newTarget );
                                     newGroundObject = r->newTarget;
                                     
@@ -7964,6 +8006,19 @@ int main() {
                                     if( r->newTarget > 0 
                                         && getObject( r->newTarget )->floor ) {
 
+                                        if( r->newTarget == getNationSpawnObjectID( nextPlayer->nation )) {
+                                            // player is creating the unique spawn object of their nation
+                                            char *fileName = autoSprintf( "nation%dPositionX", nextPlayer->nation );
+                                            SettingsManager::setSetting( fileName, m.x );
+                                            fileName = autoSprintf( "nation%dPositionY", nextPlayer->nation );
+                                            SettingsManager::setSetting( fileName, m.y );
+
+                                            SimpleVector<char*> nationMembers;
+                                            readNameGivingPhrases( "nationMembers", &nationMembers );
+                                            AppLog::infoF( "Nation %s spawn point set to %d %d\n", getNationName( nextPlayer->email, &nationMembers ), m.x, m.y );
+                                            nationMembers.deallocateStringElements();
+                                        }
+                                        
                                         // it turns into a floor
                                         setMapObject( m.x, m.y, 0 );
                                         
@@ -7977,6 +8032,18 @@ int main() {
                                             }
                                         }
                                     else {    
+                                        if( r->newTarget == getNationSpawnObjectID( nextPlayer->nation )) {
+                                            // player is creating the unique spawn object of their nation
+                                            char *fileName = autoSprintf( "nation%dPositionX", nextPlayer->nation );
+                                            SettingsManager::setSetting( fileName, m.x );
+                                            fileName = autoSprintf( "nation%dPositionY", nextPlayer->nation );
+                                            SettingsManager::setSetting( fileName, m.y );
+
+                                            SimpleVector<char*> nationMembers;
+                                            readNameGivingPhrases( "nationMembers", &nationMembers );
+                                            AppLog::infoF( "Nation %s spawn point set to %d %d\n", getNationName( nextPlayer->email, &nationMembers ), m.x, m.y );
+                                            nationMembers.deallocateStringElements();
+                                        }
                                         setMapObject( m.x, m.y, r->newTarget );
                                         newGroundObject = r->newTarget;
                                         }

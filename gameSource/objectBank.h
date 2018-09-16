@@ -154,6 +154,8 @@ typedef struct ObjectRecord {
         // (example:  lasso an animal, but has no effect on a person)
         int useDistance;
         
+        int nationId;
+        
 
         SoundUsage creationSound;
         SoundUsage usingSound;
@@ -357,7 +359,7 @@ int initObjectBankStart( char *outRebuildingCache,
                          char inAutoGenerateVariableObjects = false );
 
 // returns progress... ready for Finish when progress == 1.0
-float initObjectBankStep();
+float initObjectBankStep( SimpleVector<char*> inList );
 void initObjectBankFinish();
 
 
